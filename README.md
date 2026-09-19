@@ -84,18 +84,22 @@ Built with Python and **PySide6**, ChronoMate Desktop transforms the chronograph
 
 ### 🚀 One-Click Launcher (Recommended)
 
+Clone the repository and run the launcher:
+```bash
+git clone https://github.com/Rec0iL/ChronoMate-Desktop.git
+cd ChronoMate-Desktop
+```
+
 The launcher automatically detects Python 3, sets up a virtual environment if needed, installs any missing dependencies from `requirements.txt`, and boots the app:
 
 #### Linux / macOS:
 ```bash
-cd chronomate-desktop
 ./start.sh
 ```
 
 #### Windows:
 Double-click `start.bat` in File Explorer, or run in Command Prompt:
 ```cmd
-cd chronomate-desktop
 start.bat
 ```
 *(PowerShell users can also run `.\start.ps1`)*
@@ -105,7 +109,6 @@ start.bat
 ### Manual Setup
 
 ```bash
-cd chronomate-desktop
 pip install -r requirements.txt
 python3 main.py
 ```
