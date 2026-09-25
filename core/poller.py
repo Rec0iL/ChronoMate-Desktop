@@ -147,13 +147,34 @@ class ChronoPoller(QThread):
         return None
 
     def _fetch(self, session: requests.Session, url: str, timeout: float = 1.5) -> Optional[str]:
+        # The HT-X3000 firmware sends a Content-Length that overstates the
+        # actual body and then closes the connection early, so a strict
+        # read raises ChunkedEncodingError/ProtocolError even though the
+        # telemetry we need already arrived. Stream the body and keep
+        # whatever bytes we got instead of discarding the whole response.
         try:
-            resp = session.get(url, timeout=timeout)
-            if resp.status_code == 200 and resp.text:
-                return resp.text
+            resp = session.get(url, timeout=timeout, stream=True)
+        except Exception:
+            return None
+
+        if resp.status_code != 200:
+            resp.close()
+            return None
+
+        chunks: List[bytes] = []
+        try:
+            for chunk in resp.iter_content(chunk_size=512):
+                if chunk:
+                    chunks.append(chunk)
         except Exception:
             pass
-        return None
+        finally:
+            resp.close()
+
+        if not chunks:
+            return None
+
+        return b"".join(chunks).decode(resp.encoding or "utf-8", errors="ignore")
 
     def _on_poll_failed(self):
         self._missed_polls += 1
