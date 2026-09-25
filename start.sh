@@ -49,7 +49,7 @@ elif [ -f "$VENV_DIR/bin/activate" ]; then
     PIP_CMD="pip"
 else
     # Check if system python allows pip or if we should create a local venv
-    CAN_IMPORT=$($PYTHON_CMD -c "import PySide6, requests, reportlab, numpy, openpyxl, pygame" 2>/dev/null && echo "yes" || echo "no")
+    CAN_IMPORT=$($PYTHON_CMD -c "import PySide6, requests, reportlab, openpyxl, pygame" 2>/dev/null && echo "yes" || echo "no")
     if [ "$CAN_IMPORT" = "no" ]; then
         echo -e "${YELLOW}[SETUP]${NC} Dependencies missing. Creating local virtual environment in ${BOLD}.venv${NC}..."
         if $PYTHON_CMD -m venv "$VENV_DIR" 2>/dev/null; then
@@ -78,7 +78,6 @@ for mod, name in [
     ('PySide6', 'PySide6'),
     ('requests', 'requests'),
     ('reportlab', 'reportlab'),
-    ('numpy', 'numpy'),
     ('openpyxl', 'openpyxl'),
     ('pygame', 'pygame-ce')
 ]:

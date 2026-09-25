@@ -55,7 +55,7 @@ if defined VIRTUAL_ENV (
     set "RUN_PIP=%PY_CMD% -m pip"
     
     :: Test if dependencies are already in system environment
-    %PY_CMD% -c "import PySide6, requests, reportlab, numpy, openpyxl, pygame" >nul 2>nul
+    %PY_CMD% -c "import PySide6, requests, reportlab, openpyxl, pygame" >nul 2>nul
     if %errorlevel% neq 0 (
         echo [SETUP] Creating local virtual environment in .venv...
         %PY_CMD% -m venv .venv
@@ -74,7 +74,7 @@ if defined VIRTUAL_ENV (
 echo [CHECK] Verifying application dependencies...
 set "PYGAME_HIDE_SUPPORT_PROMPT=1"
 
-%RUN_PY% -c "import PySide6, requests, reportlab, numpy, openpyxl, pygame" >nul 2>nul
+%RUN_PY% -c "import PySide6, requests, reportlab, openpyxl, pygame" >nul 2>nul
 if %errorlevel% neq 0 (
     echo [INSTALL] Installing missing dependencies from requirements.txt...
     %RUN_PIP% install -r requirements.txt

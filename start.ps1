@@ -39,7 +39,7 @@ if ($env:VIRTUAL_ENV) {
     $runPy = "python"
     $runPip = "pip"
 } else {
-    $depCheck = & $pyCmd.Split(' ') -c "import PySide6, requests, reportlab, numpy, openpyxl, pygame" 2>$null
+    $depCheck = & $pyCmd.Split(' ') -c "import PySide6, requests, reportlab, openpyxl, pygame" 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[SETUP] Creating local virtual environment (.venv)..." -ForegroundColor Yellow
         & $pyCmd.Split(' ') -m venv .venv
@@ -61,7 +61,7 @@ if ($env:VIRTUAL_ENV) {
 # 3. Check Dependencies
 Write-Host "[CHECK] Verifying application dependencies..." -ForegroundColor Cyan
 $env:PYGAME_HIDE_SUPPORT_PROMPT = "1"
-$check = & $runPy.Split(' ') -c "import PySide6, requests, reportlab, numpy, openpyxl, pygame" 2>$null
+$check = & $runPy.Split(' ') -c "import PySide6, requests, reportlab, openpyxl, pygame" 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[INSTALL] Installing dependencies from requirements.txt..." -ForegroundColor Yellow
     & $runPip.Split(' ') install -r requirements.txt
