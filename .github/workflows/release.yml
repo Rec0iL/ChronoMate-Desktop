@@ -153,9 +153,20 @@ jobs:
           **Note:** the builds are not code-signed. Windows SmartScreen: "More info" -> "Run anyway".
           macOS: right-click the app -> "Open" (or `xattr -cr /Applications/ChronoMate.app`).
           NOTES
-          gh release create "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "ChronoMate Desktop $RELEASE_TAG" \
-            --notes-file notes.md --generate-notes \
-            ChronoMate-* SHA256SUMS.txt
+          # Auto-generated changelog, minus the "New Contributors" section
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$RELEASE_TAG" -f target_commitish="$GITHUB_SHA" --jq .body \
+            | awk '/^## New Contributors/{skip=1; next} /^## |^\*\*Full Changelog/{skip=0} !skip' > changelog.md || true
+          { echo; cat changelog.md; } >> notes.md
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Release already exists (re-run): update notes and replace assets
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber ChronoMate-* SHA256SUMS.txt
+          else
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "ChronoMate Desktop $RELEASE_TAG" \
+              --notes-file notes.md \
+              ChronoMate-* SHA256SUMS.txt
+          fi
