@@ -1,0 +1,142 @@
+name: Release
+
+# Push a tag like v1.0.0 to build Windows / macOS / Linux packages and publish a GitHub release.
+# "Run workflow" (manual) only builds the artifacts, without publishing a release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller pillow
+      - name: Build exe
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0-dev"
+          export CHRONOMATE_VERSION="$VERSION"
+          python packaging/make_icons.py
+          pyinstaller packaging/chronomate.spec --noconfirm
+          mkdir release
+          mv dist/ChronoMate.exe "release/ChronoMate-${VERSION}-windows-x64.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: release/*
+
+  macos:
+    runs-on: macos-latest   # Apple Silicon (arm64)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller pillow
+      - name: Build app + dmg
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0-dev"
+          export CHRONOMATE_VERSION="$VERSION"
+          python packaging/make_icons.py
+          pyinstaller packaging/chronomate.spec --noconfirm
+          # Ad-hoc signature so the unsigned app runs on Apple Silicon (no Developer ID needed)
+          codesign --force --deep --sign - dist/ChronoMate.app
+          mkdir release dmg-root
+          cp -R dist/ChronoMate.app dmg-root/
+          ln -s /Applications dmg-root/Applications
+          hdiutil create -volname "ChronoMate Desktop" -srcfolder dmg-root -ov -format UDZO \
+            "release/ChronoMate-${VERSION}-macos-arm64.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: release/*
+
+  linux:
+    runs-on: ubuntu-22.04   # oldest glibc we can reasonably target -> runs on current Debian/Ubuntu/Fedora
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm ruby libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0 libfontconfig1 libdbus-1-3
+          sudo gem install --no-document fpm
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller pillow
+      - name: Build binary
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0-dev"
+          export CHRONOMATE_VERSION="$VERSION"
+          python packaging/make_icons.py
+          pyinstaller packaging/chronomate.spec --noconfirm
+      - name: Smoke test (starts headless for a few seconds)
+        run: |
+          set +e
+          QT_QPA_PLATFORM=offscreen timeout 8 dist/chronomate/chronomate
+          code=$?
+          [ "$code" = 124 ] || { echo "app exited early with code $code"; exit 1; }
+      - name: Build .deb / .rpm / .tar.gz
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0-dev"
+          packaging/build_linux_packages.sh "$VERSION" release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: release/*
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat > notes.md <<'NOTES'
+          ## Downloads
+
+          | Platform | File |
+          |:--|:--|
+          | Windows 10/11 (x64) | `ChronoMate-*-windows-x64.exe` - portable, just double-click |
+          | macOS (Apple Silicon) | `ChronoMate-*-macos-arm64.dmg` - drag into Applications |
+          | Debian / Ubuntu | `ChronoMate-*-linux-amd64.deb` - `sudo apt install ./ChronoMate-*.deb` |
+          | Fedora | `ChronoMate-*-linux-x86_64.rpm` - `sudo dnf install ./ChronoMate-*.rpm` |
+          | Other Linux (x86_64) | `ChronoMate-*-linux-x86_64.tar.gz` - extract and run `chronomate/chronomate` |
+
+          **Note:** the builds are not code-signed. Windows SmartScreen: "More info" -> "Run anyway".
+          macOS: right-click the app -> "Open" (or `xattr -cr /Applications/ChronoMate.app`).
+          NOTES
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "ChronoMate Desktop $GITHUB_REF_NAME" \
+            --notes-file notes.md --generate-notes \
+            ChronoMate-* SHA256SUMS.txt

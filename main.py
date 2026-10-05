@@ -28,6 +28,7 @@ def main():
     app.setApplicationName("ChronoMate")
     app.setApplicationDisplayName("ChronoMate Desktop")
     app.setOrganizationName("GhostWarriorCommando")
+    app.setDesktopFileName("chronomate")
 
     # Set Window Icon
     logo_path = root_dir / "assets" / "logo.png"

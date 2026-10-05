@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ChronoMate Desktop
+GenericName=Chronograph Companion
+Comment=Companion application for HT-X3000 / HT-50 airsoft chronographs
+Exec=chronomate
+Icon=chronomate
+Terminal=false
+Categories=Utility;Science;
+StartupWMClass=ChronoMate
