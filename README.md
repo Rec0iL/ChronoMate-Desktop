@@ -137,3 +137,9 @@ python3 main.py
 | `ESC` | Exit Full-Screen HUD Mode |
 | `Space` | *(In HUD Mode)* Toggle between Dashboard Mode and Orga Marshaling Mode |
 | `☀️ / 🌙` | Toggle between Tactical Dark and Clean Light themes |
+
+---
+
+## 📜 License
+
+ChronoMate Desktop is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE): free to use, modify and share for any **non-commercial** purpose (hobby, clubs, events, research, education). Commercial use requires separate permission from the author.

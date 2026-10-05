@@ -132,6 +132,8 @@ jobs:
           | Fedora | `ChronoMate-*-linux-x86_64.rpm` - `sudo dnf install ./ChronoMate-*.rpm` |
           | Other Linux (x86_64) | `ChronoMate-*-linux-x86_64.tar.gz` - extract and run `chronomate/chronomate` |
 
+          License: [PolyForm Noncommercial 1.0.0](https://github.com/Rec0iL/ChronoMate-Desktop/blob/main/LICENSE) - free for non-commercial use.
+
           **Note:** the builds are not code-signed. Windows SmartScreen: "More info" -> "Run anyway".
           macOS: right-click the app -> "Open" (or `xattr -cr /Applications/ChronoMate.app`).
           NOTES

@@ -19,6 +19,9 @@ cp -a "$ROOT/dist/chronomate" "$STAGE/opt/chronomate"
 ln -s /opt/chronomate/chronomate "$STAGE/usr/bin/chronomate"
 install -m 644 "$ROOT/packaging/chronomate.desktop" "$STAGE/usr/share/applications/chronomate.desktop"
 install -m 644 "$ROOT/packaging/build-icons/chronomate.png" "$STAGE/usr/share/icons/hicolor/256x256/apps/chronomate.png"
+mkdir -p "$STAGE/usr/share/licenses/chronomate"
+install -m 644 "$ROOT/LICENSE" "$STAGE/usr/share/licenses/chronomate/LICENSE"
+cp "$ROOT/LICENSE" "$ROOT/dist/chronomate/LICENSE"
 chmod -R go-w "$STAGE"
 
 # Generic tarball (portable, no root needed)
@@ -28,6 +31,7 @@ COMMON=(
   -s dir -n chronomate -v "$VERSION" --iteration 1
   --description "Companion application for HT-X3000 / HT-50 airsoft chronographs"
   --url "https://github.com/Rec0iL/ChronoMate-Desktop"
+  --license "PolyForm-Noncommercial-1.0.0"
   --maintainer "Rec0iL <recoil666@gmail.com>"
   -C "$STAGE" opt usr
 )
