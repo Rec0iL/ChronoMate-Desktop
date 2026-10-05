@@ -6,12 +6,19 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag to create + publish as a release (e.g. v1.0.0). Leave empty for a build-only dry run."
+        required: false
+        default: ""
 
 permissions:
   contents: write
 
 env:
   PYTHON_VERSION: "3.12"
+  # Tag being released: manual input, or the pushed tag. Empty = dry run (no release).
+  RELEASE_TAG: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name || '') }}
 
 jobs:
   windows:
@@ -27,8 +34,8 @@ jobs:
       - name: Build exe
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0-dev"
+          VERSION="${RELEASE_TAG#v}"
+          [ -n "$RELEASE_TAG" ] || VERSION="0.0.0-dev"
           export CHRONOMATE_VERSION="$VERSION"
           python packaging/make_icons.py
           pyinstaller packaging/chronomate.spec --noconfirm
@@ -59,8 +66,8 @@ jobs:
         run: pip install -r requirements.txt pyinstaller pillow
       - name: Build app + dmg
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0-dev"
+          VERSION="${RELEASE_TAG#v}"
+          [ -n "$RELEASE_TAG" ] || VERSION="0.0.0-dev"
           export CHRONOMATE_VERSION="$VERSION"
           python packaging/make_icons.py
           pyinstaller packaging/chronomate.spec --noconfirm
@@ -93,8 +100,8 @@ jobs:
         run: pip install -r requirements.txt pyinstaller pillow
       - name: Build binary
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0-dev"
+          VERSION="${RELEASE_TAG#v}"
+          [ -n "$RELEASE_TAG" ] || VERSION="0.0.0-dev"
           export CHRONOMATE_VERSION="$VERSION"
           python packaging/make_icons.py
           pyinstaller packaging/chronomate.spec --noconfirm
@@ -106,8 +113,8 @@ jobs:
           [ "$code" = 124 ] || { echo "app exited early with code $code"; exit 1; }
       - name: Build .deb / .rpm / .tar.gz
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="0.0.0-dev"
+          VERSION="${RELEASE_TAG#v}"
+          [ -n "$RELEASE_TAG" ] || VERSION="0.0.0-dev"
           packaging/build_linux_packages.sh "$VERSION" release
       - uses: actions/upload-artifact@v4
         with:
@@ -115,7 +122,7 @@ jobs:
           path: release/*
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: inputs.version != '' || startsWith(github.ref, 'refs/tags/v')
     needs: [windows, macos, linux]
     runs-on: ubuntu-latest
     steps:
@@ -146,8 +153,9 @@ jobs:
           **Note:** the builds are not code-signed. Windows SmartScreen: "More info" -> "Run anyway".
           macOS: right-click the app -> "Open" (or `xattr -cr /Applications/ChronoMate.app`).
           NOTES
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "ChronoMate Desktop $GITHUB_REF_NAME" \
+            --target "$GITHUB_SHA" \
+            --title "ChronoMate Desktop $RELEASE_TAG" \
             --notes-file notes.md --generate-notes \
             ChronoMate-* SHA256SUMS.txt
