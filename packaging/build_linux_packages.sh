@@ -31,7 +31,7 @@ COMMON=(
   -s dir -n chronomate -v "$VERSION" --iteration 1
   --description "Companion application for HT-X3000 / HT-50 airsoft chronographs"
   --url "https://github.com/Rec0iL/ChronoMate-Desktop"
-  --license "PolyForm-Noncommercial-1.0.0"
+  --license "PolyForm-Shield-1.0.0"
   --maintainer "Rec0iL <recoil666@gmail.com>"
   -C "$STAGE" opt usr
 )

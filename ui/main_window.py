@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addStretch()
 
         # Version at bottom of sidebar
-        lbl_version = QLabel("ChronoMate Desktop v1.0")
+        lbl_version = QLabel("ChronoMate Desktop v1.0.1")
         lbl_version.setObjectName("label_secondary")
         lbl_version.setAlignment(Qt.AlignCenter)
         sidebar_layout.addWidget(lbl_version)

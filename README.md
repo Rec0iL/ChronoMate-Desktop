@@ -143,4 +143,12 @@ python3 main.py
 
 ## 📜 License
 
-ChronoMate Desktop is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE): free to use, modify and share for any **non-commercial** purpose (hobby, clubs, events, research, education). Commercial use requires separate permission from the author.
+ChronoMate Desktop is source-available under the [PolyForm Shield License 1.0.0](LICENSE).
+
+- ✅ **Free to use for any purpose** – hobby, clubs, airsoft fields, workshops and technicians (e.g. generating PDF reports for customers), events, research, education
+- ✅ Read, modify and share the code, as long as you keep the license and notices
+- ❌ **Not allowed:** using the code to provide a product that competes with ChronoMate Desktop – e.g. rebranding it, selling it, or bundling it with chronographs or other apps (desktop/Android/…)
+
+Want to bundle or resell it? Get in touch for a commercial license.
+
+"ChronoMate" and the ChronoMate logo are trademarks of the author; the license does not grant the right to use them for your own products.
