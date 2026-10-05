@@ -82,6 +82,21 @@ Built with Python and **PySide6**, ChronoMate Desktop transforms the chronograph
 
 ## 🛠 Installation & Quick Start
 
+### 📦 Download a Ready-Made Release
+
+Pre-built packages are attached to every [GitHub release](https://github.com/Rec0iL/ChronoMate-Desktop/releases/latest) – no Python required:
+
+| Platform | File | Install |
+|:---|:---|:---|
+| **Windows 10/11** | `ChronoMate-*-windows-x64.exe` | Portable single `.exe` – just double-click (SmartScreen: *More info → Run anyway*) |
+| **macOS** (Apple Silicon) | `ChronoMate-*-macos-arm64.dmg` | Open the DMG, drag *ChronoMate* into *Applications*; first launch via right-click → *Open* |
+| **macOS** (Intel) | `ChronoMate-*-macos-x86_64.dmg` | Same as above |
+| **Debian / Ubuntu** | `ChronoMate-*-linux-amd64.deb` | `sudo apt install ./ChronoMate-*.deb` |
+| **Fedora** | `ChronoMate-*-linux-x86_64.rpm` | `sudo dnf install ./ChronoMate-*.rpm` |
+| **Other Linux** | `ChronoMate-*-linux-x86_64.tar.gz` | Extract and run `chronomate/chronomate` |
+
+The builds are not code-signed. Releases are built automatically by `.github/workflows/release.yml` when a tag like `v1.0.0` is pushed.
+
 ### 🚀 One-Click Launcher (Recommended)
 
 Clone the repository and run the launcher:
@@ -123,3 +138,9 @@ python3 main.py
 | `ESC` | Exit Full-Screen HUD Mode |
 | `Space` | *(In HUD Mode)* Toggle between Dashboard Mode and Orga Marshaling Mode |
 | `☀️ / 🌙` | Toggle between Tactical Dark and Clean Light themes |
+
+---
+
+## 📜 License
+
+ChronoMate Desktop is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE): free to use, modify and share for any **non-commercial** purpose (hobby, clubs, events, research, education). Commercial use requires separate permission from the author.

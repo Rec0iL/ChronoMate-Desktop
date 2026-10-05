@@ -12,3 +12,6 @@ export/
 .idea/
 .vscode/
 .DS_Store
+packaging/build-icons/
+build/
+dist/
