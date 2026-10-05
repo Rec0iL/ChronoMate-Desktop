@@ -90,6 +90,7 @@ Pre-built packages are attached to every [GitHub release](https://github.com/Rec
 |:---|:---|:---|
 | **Windows 10/11** | `ChronoMate-*-windows-x64.exe` | Portable single `.exe` – just double-click (SmartScreen: *More info → Run anyway*) |
 | **macOS** (Apple Silicon) | `ChronoMate-*-macos-arm64.dmg` | Open the DMG, drag *ChronoMate* into *Applications*; first launch via right-click → *Open* |
+| **macOS** (Intel) | `ChronoMate-*-macos-x86_64.dmg` | Same as above |
 | **Debian / Ubuntu** | `ChronoMate-*-linux-amd64.deb` | `sudo apt install ./ChronoMate-*.deb` |
 | **Fedora** | `ChronoMate-*-linux-x86_64.rpm` | `sudo dnf install ./ChronoMate-*.rpm` |
 | **Other Linux** | `ChronoMate-*-linux-x86_64.tar.gz` | Extract and run `chronomate/chronomate` |

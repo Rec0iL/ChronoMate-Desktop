@@ -40,7 +40,15 @@ jobs:
           path: release/*
 
   macos:
-    runs-on: macos-latest   # Apple Silicon (arm64)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64     # Apple Silicon
+            runner: macos-latest
+          - arch: x86_64    # Intel
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -62,10 +70,10 @@ jobs:
           cp -R dist/ChronoMate.app dmg-root/
           ln -s /Applications dmg-root/Applications
           hdiutil create -volname "ChronoMate Desktop" -srcfolder dmg-root -ov -format UDZO \
-            "release/ChronoMate-${VERSION}-macos-arm64.dmg"
+            "release/ChronoMate-${VERSION}-macos-${{ matrix.arch }}.dmg"
       - uses: actions/upload-artifact@v4
         with:
-          name: macos
+          name: macos-${{ matrix.arch }}
           path: release/*
 
   linux:
@@ -128,6 +136,7 @@ jobs:
           |:--|:--|
           | Windows 10/11 (x64) | `ChronoMate-*-windows-x64.exe` - portable, just double-click |
           | macOS (Apple Silicon) | `ChronoMate-*-macos-arm64.dmg` - drag into Applications |
+          | macOS (Intel) | `ChronoMate-*-macos-x86_64.dmg` - drag into Applications |
           | Debian / Ubuntu | `ChronoMate-*-linux-amd64.deb` - `sudo apt install ./ChronoMate-*.deb` |
           | Fedora | `ChronoMate-*-linux-x86_64.rpm` - `sudo dnf install ./ChronoMate-*.rpm` |
           | Other Linux (x86_64) | `ChronoMate-*-linux-x86_64.tar.gz` - extract and run `chronomate/chronomate` |
