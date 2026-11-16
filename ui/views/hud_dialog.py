@@ -136,7 +136,7 @@ class ScaledHudCard(QFrame):
         reserve_text_space(self.lbl_status, [tr("awaiting_shot"), f"{tr('legal')} ✓", f"{tr('illegal')} ✕"],
                            font(font_status, QFont.Black))
         reserve_text_space(self.lbl_detail, ["--", tr("max_bb_weight_label", 88.88), tr("exceeds_limit_20")],
-                           font(font_detail, QFont.Normal))
+                           font(font_detail, QFont.Normal), lines=2)
 
         self.lbl_name.setText(display_name)
         self.lbl_name.setStyleSheet(f"color: {name_c};")

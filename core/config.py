@@ -50,6 +50,7 @@ class ConfigManager:
         self.selected_weight: float = 0.20
         self.weight_type: WeightType = WeightType.BB
         self.custom_weights: List[CustomWeight] = []
+        self.always_show_custom_weights: bool = False
 
         self.max_allowed_joule: float = 1.50
         self.max_allowed_overhop_cm: float = 15.0
@@ -70,6 +71,17 @@ class ConfigManager:
         self.gravity: float = 9.81
 
         self.load()
+
+    def active_weapon_class(self) -> Optional[WeaponClass]:
+        for wc in self.weapon_classes:
+            if wc.name == self.selected_weapon_class:
+                return wc
+        return self.weapon_classes[0] if self.weapon_classes else None
+
+    def active_joule_limit(self) -> float:
+        """Joule limit of the active Orga weapon class (falls back to the old global limit)."""
+        wc = self.active_weapon_class()
+        return wc.max_joules if wc else self.max_allowed_joule
 
     def add_calibration_entry(self, chrono_val: float, control_val: Optional[float] = None):
         self.calibration_entries.append(CalibrationEntry(chrono_value=chrono_val, control_value=control_val))
@@ -126,6 +138,7 @@ class ConfigManager:
             self.selected_weight = float(data.get("selected_weight", 0.20))
             self.weight_type = WeightType(data.get("weight_type", WeightType.BB.value))
 
+            self.always_show_custom_weights = bool(data.get("always_show_custom_weights", False))
             self.custom_weights = [
                 CustomWeight(
                     name=w.get("name", "Custom"),
@@ -175,6 +188,7 @@ class ConfigManager:
             "sound_muted": self.sound_muted,
             "selected_weight": self.selected_weight,
             "weight_type": self.weight_type.value,
+            "always_show_custom_weights": self.always_show_custom_weights,
             "custom_weights": [
                 {
                     "name": cw.name,

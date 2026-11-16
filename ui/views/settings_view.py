@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QMessageBox,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont, QColor
 
 from core.models import (
@@ -42,6 +42,8 @@ from core.config import ConfigManager
 from core.session_manager import SessionManager
 from core.audio import AudioManager
 from core.i18n import tr, I18n
+from core.weights import available_weights, weight_in_list, same_weight
+from ui.components.weight_chips import WeightChipBar
 
 
 class SettingsView(QWidget):
@@ -51,6 +53,9 @@ class SettingsView(QWidget):
     weight_type_changed = Signal(str)
     custom_weights_changed = Signal()
     calibration_changed = Signal(float)  # Emits new compensation factor
+    weight_selected = Signal(float)       # A weight chip in Settings was clicked
+    chrono_model_changed = Signal()
+    physics_changed = Signal()
 
     def __init__(self, dark_mode: bool = True, parent=None):
         super().__init__(parent)
@@ -240,10 +245,31 @@ class SettingsView(QWidget):
         w_type_row.addWidget(self.btn_custom)
         weight_layout.addLayout(w_type_row)
 
+        # Always-show-custom switch (off = custom weights only appear with the Custom type)
+        self.chk_always_custom = QCheckBox(tr("always_show_custom"))
+        self.chk_always_custom.setChecked(self._cfg.always_show_custom_weights)
+        self.chk_always_custom.setToolTip(tr("always_show_custom_desc"))
+        self.chk_always_custom.toggled.connect(self._on_always_custom_toggled)
+        weight_layout.addWidget(self.chk_always_custom)
+
+        # Loaded weights: what the chips everywhere else offer right now (click = select)
+        self.lbl_loaded = QLabel(tr("loaded_weights"))
+        self.lbl_loaded.setObjectName("label_secondary")
+        weight_layout.addWidget(self.lbl_loaded)
+        self.loaded_chips = WeightChipBar(self)
+        self.loaded_chips.weight_clicked.connect(self._on_loaded_weight_clicked)
+        weight_layout.addWidget(self.loaded_chips)
+
         # Custom Weights Table
+        self.lbl_custom_list = QLabel(tr("custom_weights_list"))
+        self.lbl_custom_list.setObjectName("label_secondary")
+        weight_layout.addWidget(self.lbl_custom_list)
         self.custom_table = QTableWidget()
         self.custom_table.setColumnCount(4)
-        self.custom_table.setHorizontalHeaderLabels(["Name", "Weight (g)", "Caliber (mm)", "Action"])
+        self.custom_table.setHorizontalHeaderLabels([
+            tr("custom_col_name"), tr("custom_col_weight"), tr("custom_col_caliber"), tr("custom_col_action")
+        ])
+        self.custom_table.cellChanged.connect(self._on_custom_cell_changed)
         self.custom_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.custom_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.custom_table.setFixedHeight(140)
@@ -388,6 +414,37 @@ class SettingsView(QWidget):
         phys_layout.addWidget(lbl_k, 3, 0)
         phys_layout.addWidget(self.spin_k, 3, 1)
 
+        # BB diameter (Android has had these three as well)
+        lbl_d = QLabel(tr("phys_diameter"))
+        self.spin_diameter = QDoubleSpinBox()
+        self.spin_diameter.setRange(4.0, 9.0)
+        self.spin_diameter.setDecimals(2)
+        self.spin_diameter.setSingleStep(0.01)
+        self.spin_diameter.setValue(self._cfg.diameter_mm)
+        self.spin_diameter.valueChanged.connect(lambda v: self._update_phys(diameter_mm=v))
+        phys_layout.addWidget(lbl_d, 4, 0)
+        phys_layout.addWidget(self.spin_diameter, 4, 1)
+
+        lbl_cr = QLabel(tr("phys_spin_damping"))
+        self.spin_cr = QDoubleSpinBox()
+        self.spin_cr.setRange(0.0, 0.1)
+        self.spin_cr.setDecimals(4)
+        self.spin_cr.setSingleStep(0.001)
+        self.spin_cr.setValue(self._cfg.spin_damping_cr)
+        self.spin_cr.valueChanged.connect(lambda v: self._update_phys(spin_damping_cr=v))
+        phys_layout.addWidget(lbl_cr, 5, 0)
+        phys_layout.addWidget(self.spin_cr, 5, 1)
+
+        lbl_g = QLabel(tr("phys_gravity"))
+        self.spin_g = QDoubleSpinBox()
+        self.spin_g.setRange(9.70, 9.90)
+        self.spin_g.setDecimals(3)
+        self.spin_g.setSingleStep(0.001)
+        self.spin_g.setValue(self._cfg.gravity)
+        self.spin_g.valueChanged.connect(lambda v: self._update_phys(gravity=v))
+        phys_layout.addWidget(lbl_g, 6, 0)
+        phys_layout.addWidget(self.spin_g, 6, 1)
+
         layout.addWidget(phys_card)
         layout.addStretch()
 
@@ -431,6 +488,7 @@ class SettingsView(QWidget):
         val = self.combo_model.currentData()
         self._cfg.chrono_type = ChronoType(val)
         self._cfg.save()
+        self.chrono_model_changed.emit()
 
     def _on_auto_ip_toggled(self, checked: bool):
         self._cfg.auto_ip_enabled = checked
@@ -458,26 +516,37 @@ class SettingsView(QWidget):
     def _set_weight_type(self, w_type: WeightType):
         self._cfg.weight_type = w_type
 
-        # Adjust selected weight to fit new category
-        if w_type == WeightType.BB:
-            if self._cfg.selected_weight not in STANDARD_BB_WEIGHTS:
-                self._cfg.selected_weight = 0.20
-        elif w_type == WeightType.DIABLO:
-            if self._cfg.selected_weight not in STANDARD_DIABLO_WEIGHTS:
-                self._cfg.selected_weight = 0.50
-        elif w_type == WeightType.CUSTOM:
-            if self._cfg.custom_weights:
-                self._cfg.selected_weight = self._cfg.custom_weights[0].weight
-            else:
-                self._cfg.selected_weight = 0.20
+        # Keep the selected weight if the new list still offers it, else take its first weight,
+        # so new shots are never stored with a weight that isn't in the list.
+        options = available_weights(self._cfg)
+        if not weight_in_list(self._cfg.selected_weight, options):
+            self._cfg.selected_weight = options[0].weight
 
         self._cfg.save()
         self.btn_bb.setChecked(w_type == WeightType.BB)
         self.btn_diablo.setChecked(w_type == WeightType.DIABLO)
         self.btn_custom.setChecked(w_type == WeightType.CUSTOM)
+        self.loaded_chips.rebuild()
 
         # Notify other views!
         self.weight_type_changed.emit(w_type.value)
+
+    def _on_always_custom_toggled(self, checked: bool):
+        self._cfg.always_show_custom_weights = checked
+        options = available_weights(self._cfg)
+        if not weight_in_list(self._cfg.selected_weight, options):
+            self._cfg.selected_weight = options[0].weight
+        self._cfg.save()
+        self.loaded_chips.rebuild()
+        self.custom_weights_changed.emit()
+
+    def _on_loaded_weight_clicked(self, weight: float):
+        self._cfg.selected_weight = weight
+        self._cfg.save()
+        self.weight_selected.emit(weight)
+
+    def set_active_weight(self, weight: float):
+        self.loaded_chips.set_active(weight)
 
     def _add_custom_weight(self):
         name, ok1 = QInputDialog.getText(self, "Add Custom Weight", "Weight Name:", text=f"Custom #{len(self._cfg.custom_weights)+1}")
@@ -491,16 +560,56 @@ class SettingsView(QWidget):
         self._cfg.custom_weights.append(cw)
         self._cfg.save()
         self._refresh_custom_weights_table()
+        self.loaded_chips.rebuild()
         self.custom_weights_changed.emit()
 
     def _delete_custom_weight(self, index: int):
         if 0 <= index < len(self._cfg.custom_weights):
             self._cfg.custom_weights.pop(index)
+            options = available_weights(self._cfg)
+            if not weight_in_list(self._cfg.selected_weight, options):
+                self._cfg.selected_weight = options[0].weight
             self._cfg.save()
             self._refresh_custom_weights_table()
+            self.loaded_chips.rebuild()
             self.custom_weights_changed.emit()
 
+    def _on_custom_cell_changed(self, row: int, col: int):
+        """Typing into the custom weights table is saved (name, weight, caliber)."""
+        if not (0 <= row < len(self._cfg.custom_weights)) or col > 2:
+            return
+        item = self.custom_table.item(row, col)
+        if item is None:
+            return
+        cw = self._cfg.custom_weights[row]
+        text = item.text().strip().replace(",", ".")
+        old_weight = cw.weight
+        if col == 0:
+            if text:
+                cw.name = text
+        else:
+            try:
+                value = float(text)
+            except ValueError:
+                value = None
+            if col == 1 and value is not None and 0.01 <= value <= 100.0:
+                cw.weight = value
+            elif col == 2 and value is not None and 0.1 <= value <= 50.0:
+                cw.caliber = value
+        if same_weight(self._cfg.selected_weight, old_weight) and not same_weight(old_weight, cw.weight):
+            self._cfg.selected_weight = cw.weight
+        self._cfg.save()
+        # Rebuild after Qt has finished committing the edit (re-formats / undoes invalid input).
+        QTimer.singleShot(0, self._refresh_custom_weights_table)
+        self.loaded_chips.rebuild()
+        self.custom_weights_changed.emit()
+
     def _refresh_custom_weights_table(self):
+        self.custom_table.blockSignals(True)
+        self._fill_custom_weights_table()
+        self.custom_table.blockSignals(False)
+
+    def _fill_custom_weights_table(self):
         self.custom_table.setRowCount(len(self._cfg.custom_weights))
         for idx, cw in enumerate(self._cfg.custom_weights):
             self.custom_table.setItem(idx, 0, QTableWidgetItem(cw.name))
@@ -704,6 +813,7 @@ class SettingsView(QWidget):
         for k, v in kwargs.items():
             setattr(self._cfg, k, v)
         self._cfg.save()
+        self.physics_changed.emit()
 
     def retranslate(self):
         self.lbl_title.setText(tr("general_settings"))

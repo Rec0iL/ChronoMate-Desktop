@@ -24,6 +24,7 @@ class SessionManager:
         self.sessions_dir = Path(data_dir) / "sessions" if data_dir else Path.home() / ".local" / "share" / "ChronoMate" / "sessions"
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         self.active_session: ChronoSession = ChronoSession()
+        self.fire_rate: str = "0.0"   # latest rate of fire reported by the chrono (r/m)
 
     def reset_active_session(self, name: str = "New Session", gun_name: str = "", weapon_class: str = "AR", weight: float = 0.20):
         self.active_session = ChronoSession(

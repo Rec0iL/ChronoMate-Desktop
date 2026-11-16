@@ -221,6 +221,18 @@ class Theme:
                     min-width: 0px;
                 }}
 
+                /* Any checkable button (e.g. BB / Diablos / Custom): show the selected one */
+                QPushButton:checked {{
+                    background-color: rgba(136, 255, 17, 0.15);
+                    border: 1px solid {cls.DARK_ACCENT_PRIMARY};
+                    color: {cls.DARK_ACCENT_PRIMARY};
+                    font-weight: 700;
+                }}
+                /* Custom weights among the chips get a dashed outline */
+                QPushButton#chip_btn[custom="true"] {{
+                    border-style: dashed;
+                }}
+
                 /* LineEdit & Input */
                 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
                     background-color: #0a0d12;
@@ -418,6 +430,18 @@ class Theme:
                 QPushButton#theme_toggle_btn {{
                     padding: 0px;
                     min-width: 0px;
+                }}
+
+                /* Any checkable button (e.g. BB / Diablos / Custom): show the selected one */
+                QPushButton:checked {{
+                    background-color: #E8F5E9;
+                    border: 1px solid {cls.LIGHT_ACCENT_PRIMARY};
+                    color: {cls.LIGHT_ACCENT_PRIMARY};
+                    font-weight: 700;
+                }}
+                /* Custom weights among the chips get a dashed outline */
+                QPushButton#chip_btn[custom="true"] {{
+                    border-style: dashed;
                 }}
 
                 /* LineEdit & Input */

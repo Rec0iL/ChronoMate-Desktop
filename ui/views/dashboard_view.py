@@ -24,6 +24,7 @@ from core.i18n import tr
 from ui.components.hero_card import HeroCard
 from ui.components.stats_grid import StatsGrid
 from ui.components.shot_chart import ShotChart
+from ui.components.weight_chips import WeightChipBar
 
 
 class DashboardView(QWidget):
@@ -41,18 +42,17 @@ class DashboardView(QWidget):
 
         # Title & Subtitle
         header_row = QHBoxLayout()
-        self.lbl_title = QLabel("HT-X3000 Shot Chronograph")
+        self.lbl_title = QLabel()
         self.lbl_title.setObjectName("section_title")
+        self.update_title()
         header_row.addWidget(self.lbl_title)
         header_row.addStretch()
         main_layout.addLayout(header_row)
 
-        # Weight Selection Chips
-        self.weight_container = QHBoxLayout()
-        self.weight_container.setSpacing(6)
-        self._weight_chips: List[QPushButton] = []
-        main_layout.addLayout(self.weight_container)
-        self.rebuild_weight_chips()
+        # Weight Selection Chips (loaded weights, then custom weights when enabled)
+        self.weight_bar = WeightChipBar(self)
+        self.weight_bar.weight_clicked.connect(self._on_chip_clicked)
+        main_layout.addWidget(self.weight_bar)
 
         # Telemetry Row (HeroCard + StatsGrid)
         telemetry_row = QHBoxLayout()
@@ -86,36 +86,12 @@ class DashboardView(QWidget):
     def _reset_chart_zoom(self):
         self.shot_chart.reset_view()
 
+    @property
+    def _weight_chips(self) -> List[QPushButton]:
+        return self.weight_bar.chips()
+
     def rebuild_weight_chips(self):
-        # Cleanly clear all widgets and spacer items
-        while self.weight_container.count():
-            item = self.weight_container.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        self._weight_chips.clear()
-
-        # Collect available weights based on active weight category
-        weights_data: List[Tuple[float, str]] = []
-        if self._cfg.weight_type == WeightType.BB:
-            weights_data = [(w, f"{w:.2f}g") for w in STANDARD_BB_WEIGHTS]
-        elif self._cfg.weight_type == WeightType.DIABLO:
-            weights_data = [(w, f"{w:.2f}g") for w in STANDARD_DIABLO_WEIGHTS]
-        else:
-            weights_data = [(cw.weight, f"{cw.name} {cw.weight:.2f}g") for cw in self._cfg.custom_weights]
-            if not weights_data:
-                weights_data = [(0.20, "0.20g")]
-
-        for weight, label in weights_data:
-            chip = QPushButton(label)
-            chip.setObjectName("chip_btn")
-            chip.setCheckable(True)
-            chip.setProperty("weight", weight)
-            chip.setChecked(abs(weight - self._cfg.selected_weight) < 0.001)
-            chip.clicked.connect(lambda checked, w=weight: self._on_chip_clicked(w))
-            self.weight_container.addWidget(chip)
-            self._weight_chips.append(chip)
-
-        self.weight_container.addStretch()
+        self.weight_bar.rebuild()
 
     def _on_chip_clicked(self, weight: float):
         self._cfg.selected_weight = weight
@@ -124,10 +100,7 @@ class DashboardView(QWidget):
         self.weight_changed.emit(weight)
 
     def set_active_weight(self, weight: float):
-        for chip in self._weight_chips:
-            w_val = chip.property("weight")
-            if w_val is not None:
-                chip.setChecked(abs(float(w_val) - weight) < 0.001)
+        self.weight_bar.set_active(weight)
         self.refresh_stats()
 
     def refresh_stats(self):
@@ -148,18 +121,21 @@ class DashboardView(QWidget):
             var_val = sum((v - mean) ** 2 for v in vels) / len(vels) if len(vels) > 1 else 0.0
             sd = var_val ** 0.5
 
-            self.stats_grid.update_stats(avg_v, max_v, min_v, es, sd, "0.0")
+            self.stats_grid.update_stats(avg_v, max_v, min_v, es, sd, self._sm.fire_rate)
         else:
             self.hero_card.update_telemetry(0.0, 0.0)
-            self.stats_grid.update_stats(0.0, 0.0, 0.0, 0.0, 0.0, "0.0")
+            self.stats_grid.update_stats(0.0, 0.0, 0.0, 0.0, 0.0, self._sm.fire_rate)
 
     def set_theme(self, dark_mode: bool):
         self._dark_mode = dark_mode
         self.hero_card.set_theme(dark_mode)
         self.shot_chart.set_theme(dark_mode)
 
-    def retranslate(self):
+    def update_title(self):
         self.lbl_title.setText(f"{self._cfg.chrono_type.display_name} Shot Chronograph")
+
+    def retranslate(self):
+        self.update_title()
         self.lbl_trend.setText(tr("velocity_trend"))
         self.stats_grid.retranslate()
         self.rebuild_weight_chips()

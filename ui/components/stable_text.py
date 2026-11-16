@@ -9,7 +9,6 @@ from typing import Iterable
 from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtWidgets import QLabel, QSizePolicy
 
-SAMPLE_DIGITS = "88.88"   # widest digits in most fonts, used for numeric placeholders
 
 
 def text_width(font: QFont, texts: Iterable[str]) -> int:
@@ -17,14 +16,26 @@ def text_width(font: QFont, texts: Iterable[str]) -> int:
     return max((fm.horizontalAdvance(t) for t in texts), default=0)
 
 
-def reserve_text_space(label: QLabel, texts: Iterable[str], font: QFont = None, padding: int = 6):
-    """Give `label` a fixed minimum size that fits every text in `texts`."""
+def reserve_text_space(label: QLabel, texts: Iterable[str], font: QFont = None, padding: int = 6,
+                       lines: int = 1):
+    """Give `label` a fixed size that fits every text in `texts`.
+
+    lines=1: the label is as wide as the widest text.
+    lines>1: the text may wrap; the label reserves `lines` lines of height and only needs to be as
+    wide as the longest single word, so long messages don't force wide cards.
+    """
+    texts = list(texts)
     f = font or label.font()
     if font is not None:
         label.setFont(font)
     fm = QFontMetrics(f)
-    label.setMinimumWidth(text_width(f, texts) + padding)
-    label.setFixedHeight(fm.height() + 2)
+    if lines > 1:
+        label.setWordWrap(True)
+        words = [w for t in texts for w in t.split()]
+        label.setMinimumWidth(text_width(f, words) + padding)
+    else:
+        label.setMinimumWidth(text_width(f, texts) + padding)
+    label.setFixedHeight(fm.lineSpacing() * lines + 2)
     label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
 
 

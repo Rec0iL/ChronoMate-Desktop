@@ -29,6 +29,7 @@ from core.session_manager import SessionManager
 from core.i18n import tr
 from ui.components.trajectory_canvas import TrajectoryCanvas
 from ui.components.target_canvas import TargetCanvas
+from ui.components.weight_chips import WeightChipBar
 
 
 class BallisticsView(QWidget):
@@ -40,7 +41,6 @@ class BallisticsView(QWidget):
         self._cfg = ConfigManager.get_instance()
         self._sm = SessionManager.get_instance()
         self._engine = BallisticsEngine()
-        self._weight_chips: List[QPushButton] = []
 
         # State Variables
         self._speed_mps: float = 100.0
@@ -134,10 +134,10 @@ class BallisticsView(QWidget):
         ctrl_layout.setContentsMargins(16, 14, 16, 14)
         ctrl_layout.setSpacing(12)
 
-        # Weight Chips Row
-        self.weight_row = QHBoxLayout()
-        ctrl_layout.addLayout(self.weight_row)
-        self.rebuild_weight_chips()
+        # Weight Chips Row (loaded weights, then custom weights when enabled)
+        self.weight_bar = WeightChipBar(self)
+        self.weight_bar.weight_clicked.connect(self._set_weight)
+        ctrl_layout.addWidget(self.weight_bar)
 
         # Sliders Grid (Distance, Heights, Velocity, Energy, Hop-Up, Sight)
         sliders_grid = QGridLayout()
@@ -217,34 +217,12 @@ class BallisticsView(QWidget):
 
         self.recalculate()
 
+    @property
+    def _weight_chips(self) -> List[QPushButton]:
+        return self.weight_bar.chips()
+
     def rebuild_weight_chips(self):
-        while self.weight_row.count():
-            item = self.weight_row.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        self._weight_chips.clear()
-
-        weights = []
-        if self._cfg.weight_type == WeightType.BB:
-            weights = [(w, f"{w:.2f}g") for w in STANDARD_BB_WEIGHTS]
-        elif self._cfg.weight_type == WeightType.DIABLO:
-            weights = [(w, f"{w:.2f}g") for w in STANDARD_DIABLO_WEIGHTS]
-        else:
-            weights = [(cw.weight, f"{cw.name} {cw.weight:.2f}g") for cw in self._cfg.custom_weights]
-            if not weights:
-                weights = [(0.20, "0.20g")]
-
-        for w, label in weights:
-            btn = QPushButton(label)
-            btn.setObjectName("chip_btn")
-            btn.setCheckable(True)
-            btn.setProperty("weight", w)
-            btn.setChecked(abs(w - self._cfg.selected_weight) < 0.001)
-            btn.clicked.connect(lambda chk, weight=w: self._set_weight(weight))
-            self.weight_row.addWidget(btn)
-            self._weight_chips.append(btn)
-
-        self.weight_row.addStretch()
+        self.weight_bar.rebuild()
 
     def _set_weight(self, weight: float):
         self._cfg.selected_weight = weight
@@ -253,10 +231,7 @@ class BallisticsView(QWidget):
         self.weight_changed.emit(weight)
 
     def set_active_weight(self, weight: float):
-        for chip in self._weight_chips:
-            w_val = chip.property("weight")
-            if w_val is not None:
-                chip.setChecked(abs(float(w_val) - weight) < 0.001)
+        self.weight_bar.set_active(weight)
         self.recalculate()
 
     def _on_dist_changed(self, val: int):

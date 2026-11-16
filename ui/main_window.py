@@ -190,6 +190,9 @@ class MainWindow(QMainWindow):
         self.settings_view.weight_type_changed.connect(self._on_weight_type_changed)
         self.settings_view.custom_weights_changed.connect(self._on_custom_weights_changed)
         self.settings_view.calibration_changed.connect(self._on_calibration_changed)
+        self.settings_view.weight_selected.connect(self._on_weight_selected)
+        self.settings_view.chrono_model_changed.connect(self.dashboard_view.update_title)
+        self.settings_view.physics_changed.connect(self.ballistics_view.recalculate)
 
         self.dashboard_view.weight_changed.connect(self._on_weight_selected)
         self.ballistics_view.weight_changed.connect(self._on_weight_selected)
@@ -256,8 +259,8 @@ class MainWindow(QMainWindow):
         )
         self._sm.add_shot(shot)
 
-        # Check over-joule for audio feedback
-        max_joules = self._cfg.max_allowed_joule
+        # Check over-joule for audio feedback against the active Orga weapon class
+        max_joules = self._cfg.active_joule_limit()
         if shot.energy_joules > max_joules:
             self._audio.play_alert()
         else:
@@ -290,6 +293,7 @@ class MainWindow(QMainWindow):
     def _on_weight_selected(self, weight: float):
         self.dashboard_view.set_active_weight(weight)
         self.ballistics_view.set_active_weight(weight)
+        self.settings_view.set_active_weight(weight)
         self.orga_view.refresh()
 
     def _on_calibration_changed(self, factor: float):
@@ -299,7 +303,9 @@ class MainWindow(QMainWindow):
         self.export_view.refresh()
 
     def _on_telemetry_updated(self, velocity_str: str, fire_rate_str: str):
-        pass
+        if fire_rate_str != self._sm.fire_rate:
+            self._sm.fire_rate = fire_rate_str
+            self.dashboard_view.refresh_stats()
 
     def _on_demo_toggled(self, checked: bool):
         self.poller.set_demo_mode(checked)

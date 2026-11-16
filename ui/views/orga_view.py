@@ -209,7 +209,7 @@ class ClassComplianceCard(QFrame):
 
         # Reserve room for every state up front, so LEGAL ↔ ILLEGAL never re-flows the grid.
         reserve_text_space(self.lbl_status, [tr("awaiting_shot"), f"{tr('legal')} ✓", f"{tr('illegal')} ✕"])
-        reserve_text_space(self.lbl_margin, ["--", tr("max_bb_weight_label", 88.88), tr("exceeds_limit_20")])
+        reserve_text_space(self.lbl_margin, ["--", tr("max_bb_weight_label", 88.88), tr("exceeds_limit_20")], lines=2)
 
         self.update_velocity(0.0)
 

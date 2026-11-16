@@ -171,7 +171,6 @@ class HistoryView(QWidget):
         self.lbl_count.setText(tr("total_shots", len(shots)))
 
         self.table.setRowCount(len(shots))
-        max_joules = self._cfg.max_allowed_joule
 
         # Display reversed (newest first)
         for row_idx, shot in enumerate(reversed(shots)):
