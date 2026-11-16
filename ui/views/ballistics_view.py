@@ -30,6 +30,7 @@ from core.i18n import tr
 from ui.components.trajectory_canvas import TrajectoryCanvas
 from ui.components.target_canvas import TargetCanvas
 from ui.components.weight_chips import WeightChipBar
+from ui.components.environment_card import EnvironmentCard
 
 
 class BallisticsView(QWidget):
@@ -105,6 +106,7 @@ class BallisticsView(QWidget):
         self.lbl_target_energy = QLabel("--")
         self.lbl_max_overhop = QLabel("--")
         self.lbl_overhop_dist = QLabel("--")
+        self.lbl_drift = QLabel("--")
 
         items = [
             (tr("stat_eff_range"), self.lbl_eff_range),
@@ -113,6 +115,7 @@ class BallisticsView(QWidget):
             (tr("stat_target_e"), self.lbl_target_energy),
             (tr("stat_max_oh"), self.lbl_max_overhop),
             (tr("stat_oh_dist"), self.lbl_overhop_dist),
+            (tr("stat_wind_drift"), self.lbl_drift),
         ]
 
         for idx, (title, val_lbl) in enumerate(items):
@@ -202,6 +205,11 @@ class BallisticsView(QWidget):
         ctrl_layout.addLayout(opt_row)
         layout.addWidget(ctrl_frame)
 
+        # Weather & wind (shared with the PCP calculator): air density and crosswind drift
+        self.env_card = EnvironmentCard(self)
+        self.env_card.changed.connect(self.recalculate)
+        layout.addWidget(self.env_card)
+
         # GWC Leipzig Attribution
         self.lbl_attr = QLabel(tr("powered_by"))
         self.lbl_attr.setObjectName("label_secondary")
@@ -266,7 +274,9 @@ class BallisticsView(QWidget):
             starting_height_m=self._shooter_height_m,
             launch_angle_deg=aim_angle_deg,
             diameter_mm=self._cfg.diameter_mm,
-            air_density_rho=self._cfg.air_density_rho,
+            air_density_rho=self._cfg.effective_air_density(),
+            wind_speed_mps=self._cfg.environment.wind_speed_mps,
+            wind_clock=self._cfg.environment.wind_clock,
             drag_coefficient_cw=self._cfg.drag_coefficient_cw,
             magnus_coefficient_k=self._cfg.magnus_coefficient_k,
             spin_damping_cr=self._cfg.spin_damping_cr,
@@ -293,6 +303,7 @@ class BallisticsView(QWidget):
             self.lbl_probe_info.setText(
                 f"PROBE @ {probe.distance:.1f}m | H: {probe.bb_height_cm:.1f}cm | E: {probe.energy_j:.2f}J | "
                 f"T: {probe.time_s:.2f}s | Rel: {probe.relative_impact_cm:+.1f}cm | Holdover: {probe.hold_over_cm:+.1f}cm"
+                + (f" | {tr('stat_wind_drift')}: {self._drift_text(probe.drift_cm)}" if abs(probe.drift_cm) >= 0.05 else "")
             )
         else:
             self.probe_card.setVisible(False)
@@ -308,7 +319,9 @@ class BallisticsView(QWidget):
             starting_height_m=self._shooter_height_m,
             hop_up_rad_s=self._hop_up_rad_s,
             diameter_mm=self._cfg.diameter_mm,
-            air_density_rho=self._cfg.air_density_rho,
+            air_density_rho=self._cfg.effective_air_density(),
+            wind_speed_mps=self._cfg.environment.wind_speed_mps,
+            wind_clock=self._cfg.environment.wind_clock,
             drag_coefficient_cw=self._cfg.drag_coefficient_cw,
             magnus_coefficient_k=self._cfg.magnus_coefficient_k,
             spin_damping_cr=self._cfg.spin_damping_cr,
@@ -342,6 +355,17 @@ class BallisticsView(QWidget):
         self.lbl_target_energy.setText(f"{metrics['energy_at_target']:.2f} J")
         self.lbl_max_overhop.setText(f"{metrics['max_overhop_cm']:.1f} cm")
         self.lbl_overhop_dist.setText(f"{metrics['overhop_dist_m']:.1f} m")
+        self.lbl_drift.setText(self._drift_text(metrics["drift_cm"]))
+
+    @staticmethod
+    def _drift_text(cm: float) -> str:
+        if abs(cm) < 0.05:
+            return "0.0 cm"
+        return f"{abs(cm):.1f} cm {'L' if cm < 0 else 'R'}"
+
+    def reload_environment(self):
+        self.env_card.reload()
+        self.recalculate()
 
     def update_from_new_shot(self, velocity: float):
         if velocity > 0:

@@ -302,7 +302,9 @@ class MainWindow(QMainWindow):
     def _apply_ballistic_mode(self, mode: str):
         self.trajectory_stack.setCurrentWidget(self.pcp_view if mode == BallisticMode.PCP.value else self.ballistics_view)
         if mode == BallisticMode.PCP.value:
-            self.pcp_view.recalculate()
+            self.pcp_view.refresh_settings()
+        else:
+            self.ballistics_view.reload_environment()
 
     def _on_pcp_custom_weights(self):
         self.settings_view._refresh_custom_weights_table()

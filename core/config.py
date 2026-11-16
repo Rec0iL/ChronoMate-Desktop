@@ -81,6 +81,14 @@ class ConfigManager:
 
         self.load()
 
+    def effective_air_density(self) -> float:
+        """Air density for the BB engine: the tuned value (Settings) scaled by today's weather
+        against standard air, so the GWC-calibrated drag / Magnus constants stay valid."""
+        from core.pcp_ballistics import Atmosphere
+        env = self.environment
+        today = Atmosphere(env.temperature_c, env.pressure_hpa, env.humidity_pct, env.altitude_m, env.use_altitude)
+        return self.air_density_rho * today.density() / Atmosphere(15.0, 1013.25, 0.0).density()
+
     def active_weapon_class(self) -> Optional[WeaponClass]:
         for wc in self.weapon_classes:
             if wc.name == self.selected_weapon_class:

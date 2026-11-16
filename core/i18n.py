@@ -238,6 +238,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "ballistic_mode_airsoft": "Airsoft BB (hop-up)",
         "ballistic_mode_pcp": "PCP airgun (pellet & slug)",
         "show_imperial": "Also show imperial units (fps, ft-lb, grains, yards)",
+        "stat_wind_drift": "WIND DRIFT",
     },
     "de": {
         "app_name": "ChronoMate",
@@ -470,6 +471,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "ballistic_mode_airsoft": "Airsoft-BB (Hop-up)",
         "ballistic_mode_pcp": "PCP-Luftgewehr (Diabolo & Slug)",
         "show_imperial": "Zusätzlich imperiale Einheiten (fps, ft-lb, Grain, Yards)",
+        "stat_wind_drift": "WINDABDRIFT",
     },
 }
 

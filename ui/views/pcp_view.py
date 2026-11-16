@@ -24,6 +24,7 @@ from core.pcp_ballistics import (
 from core.pcp_presets import PCP_PRESETS
 from core.session_manager import SessionManager
 from ui.components.pcp_chart import PcpChart
+from ui.components.environment_card import EnvironmentCard
 
 M_TO_YD = 1.0936133
 
@@ -235,34 +236,9 @@ class PcpView(QWidget):
         return frame
 
     def _build_environment_card(self):
-        frame, g = self._card("pcp_card_environment")
-        env = self._cfg.environment
-        self.spin_temp = spin(-30.0, 50.0, env.temperature_c, 1, 1.0, "°C")
-        self.chk_altitude = QCheckBox(tr("pcp_use_altitude"))
-        self.chk_altitude.setChecked(env.use_altitude)
-        self.spin_pressure = spin(600.0, 1100.0, env.pressure_hpa, 1, 1.0, "hPa")
-        self.spin_altitude = spin(-400.0, 5000.0, env.altitude_m, 0, 50.0, "m")
-        self.spin_humidity = spin(0.0, 100.0, env.humidity_pct, 0, 5.0, "%")
-        self.spin_wind = spin(0.0, 20.0, env.wind_speed_mps, 1, 0.5, "m/s")
-        self.spin_clock = spin(1.0, 12.0, env.wind_clock if env.wind_clock >= 1 else 12.0, 1, 0.5, tr("pcp_oclock"))
-        self.spin_clock.setWrapping(True)
-        self._row(g, 1, "pcp_temperature", self.spin_temp)
-        g.addWidget(self.chk_altitude, 2, 0, 1, 2)
-        self.lbl_pressure = self._row(g, 3, "pcp_pressure", self.spin_pressure)
-        self.lbl_altitude = self._row(g, 4, "pcp_altitude", self.spin_altitude)
-        self._row(g, 5, "pcp_humidity", self.spin_humidity)
-        self._row(g, 6, "pcp_wind_speed", self.spin_wind)
-        self._row(g, 7, "pcp_wind_dir", self.spin_clock)
-        hint = QLabel(tr("pcp_wind_hint"))
-        hint.setObjectName("label_secondary")
-        hint.setWordWrap(True)
-        g.addWidget(hint, 8, 0, 1, 2)
-        for w in (self.spin_temp, self.spin_pressure, self.spin_altitude, self.spin_humidity,
-                  self.spin_wind, self.spin_clock):
-            w.valueChanged.connect(self._on_input)
-        self.chk_altitude.toggled.connect(self._on_input)
-        self._update_altitude_visibility()
-        return frame
+        self.env_card = EnvironmentCard(self)
+        self.env_card.changed.connect(self._timer.start)
+        return self.env_card
 
     def _build_bc_card(self):
         frame, g = self._card("pcp_card_bc")
@@ -359,22 +335,12 @@ class PcpView(QWidget):
     def _on_input(self, *_):
         if self._loading:
             return
-        self._update_altitude_visibility()
         self.spin_velocity.setEnabled(self.combo_vsource.currentData() == VelocitySource.MANUAL.value)
         self._store_inputs()
         self._timer.start()
 
-    def _update_altitude_visibility(self):
-        alt = self.chk_altitude.isChecked()
-        for w in (getattr(self, "lbl_altitude", None), self.spin_altitude):
-            if w is not None:
-                w.setVisible(alt)
-        for w in (getattr(self, "lbl_pressure", None), self.spin_pressure):
-            if w is not None:
-                w.setVisible(not alt)
-
     def _store_inputs(self):
-        pc, env = self._cfg.pcp, self._cfg.environment
+        pc = self._cfg.pcp
         pc.mass_grams = self.spin_mass.value()
         pc.caliber_mm = self.spin_caliber.value()
         pc.bc = self.spin_bc.value()
@@ -389,13 +355,6 @@ class PcpView(QWidget):
         pc.step_m = self.spin_step.value()
         pc.max_range_m = self.spin_max.value()
         pc.energy_limit_j = self.spin_elimit.value()
-        env.temperature_c = self.spin_temp.value()
-        env.use_altitude = self.chk_altitude.isChecked()
-        env.pressure_hpa = self.spin_pressure.value()
-        env.altitude_m = self.spin_altitude.value()
-        env.humidity_pct = self.spin_humidity.value()
-        env.wind_speed_mps = self.spin_wind.value()
-        env.wind_clock = self.spin_clock.value() % 12.0
         self._cfg.save()
 
     # --- calculation ------------------------------------------------------------------------------
@@ -582,8 +541,9 @@ class PcpView(QWidget):
             self._timer.start()
 
     def refresh_settings(self):
-        """Units switch or custom weights changed elsewhere."""
+        """Units switch, custom weights or the weather changed elsewhere."""
         self._fill_projectiles()
+        self.env_card.reload()
         self.recalculate()
 
     def set_theme(self, dark: bool):

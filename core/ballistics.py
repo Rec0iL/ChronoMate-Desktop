@@ -39,6 +39,13 @@ class BallisticsEngine:
 
         x = 0.0
         y = params.starting_height_m
+        z = 0.0      # sideways (+ right), only moves when there is a crosswind
+        vz = 0.0
+
+        # Wind "from" clock direction (12 = from the target, 3 = from the right) → air velocity
+        theta = math.radians((params.wind_clock % 12.0) * 30.0)
+        wx = -params.wind_speed_mps * math.cos(theta)
+        wz = -params.wind_speed_mps * math.sin(theta)
 
         area_a = math.pi * (d ** 2) / 4.0
         coeff_c = 0.5 * cw * rho * area_a
@@ -58,19 +65,23 @@ class BallisticsEngine:
             vx_start = vx
             vy_now = vy
             v_start = math.sqrt(vx_start ** 2 + vy_now ** 2)
+            # Air flows past the BB at its speed relative to the wind (= ground speed without wind)
+            rx, rz = vx_start - wx, vz - wz
+            v_air = math.sqrt(rx ** 2 + vy_now ** 2 + rz ** 2)
 
             # 1. Update Rotation (decay based on current velocity)
-            decay_coeff = cr * v_start
+            decay_coeff = cr * v_air
             omega *= math.exp(-decay_coeff * step_dt)
 
             # 2. Forces
             fg = -m * g
-            fdx = -coeff_c * v_start * vx_start
-            fdy = -coeff_c * v_start * vy_now
+            fdx = -coeff_c * v_air * rx
+            fdy = -coeff_c * v_air * vy_now
+            fdz = -coeff_c * v_air * rz
 
             # Magnus Effect (Lift)
             fmx = k * rho * area_a * vy_now * omega
-            fmy = -k * rho * area_a * vx_start * omega
+            fmy = -k * rho * area_a * rx * omega
 
             # 3. Acceleration (F = m*a)
             ax = (fdx + fmx) / m
@@ -79,10 +90,12 @@ class BallisticsEngine:
             # 4. Update Position
             x += vx_start * step_dt
             y += vy_now * step_dt
+            z += vz * step_dt
 
             # 5. Update Velocity
             vx += ax * step_dt
             vy += ay * step_dt
+            vz += fdz / m * step_dt
 
             current_v = math.sqrt(vx ** 2 + vy ** 2)
             current_e = 0.5 * m * (v_start ** 2)
@@ -95,6 +108,7 @@ class BallisticsEngine:
                     velocity=current_v,
                     energy_joules=current_e,
                     time=current_time,
+                    z=z,
                 )
             )
 
@@ -127,6 +141,7 @@ class BallisticsEngine:
             time_s=pt.time,
             relative_impact_cm=(pt.y - aim_line_y) * 100.0,
             hold_over_cm=(target_height_m - pt.y) * 100.0,
+            drift_cm=pt.z * 100.0,
         )
 
     def calculate_metrics(
@@ -146,6 +161,7 @@ class BallisticsEngine:
                 "hold_over_cm": 0.0,
                 "max_overhop_cm": 0.0,
                 "overhop_dist_m": 0.0,
+                "drift_cm": 0.0,
             }
 
         max_range = trajectory[-1].x
@@ -179,6 +195,7 @@ class BallisticsEngine:
         energy_at_target = pt_target.energy_joules if pt_target else 0.0
         time_to_target = pt_target.time if pt_target else 0.0
         hold_over_cm = (target_height_m - pt_target.y) * 100.0 if pt_target else 0.0
+        drift_cm = pt_target.z * 100.0 if pt_target else 0.0
 
         max_oh = 0.0
         max_oh_dist = 0.0
@@ -198,6 +215,7 @@ class BallisticsEngine:
             "hold_over_cm": hold_over_cm,
             "max_overhop_cm": max_oh * 100.0,
             "overhop_dist_m": max_oh_dist,
+            "drift_cm": drift_cm,
         }
 
     def optimize_hopup(

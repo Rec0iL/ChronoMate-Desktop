@@ -236,6 +236,8 @@ class BallisticParams:
     magnus_coefficient_k: float = 0.002
     spin_damping_cr: float = 0.01
     gravity: float = 9.81
+    wind_speed_mps: float = 0.0
+    wind_clock: float = 3.0      # direction the wind comes FROM (12 = from the target)
 
 
 @dataclass
@@ -245,6 +247,7 @@ class TrajectoryPoint:
     velocity: float
     energy_joules: float
     time: float
+    z: float = 0.0               # sideways drift (m, + right)
 
 
 @dataclass
@@ -255,6 +258,7 @@ class ProbeResult:
     time_s: float
     relative_impact_cm: float
     hold_over_cm: float
+    drift_cm: float = 0.0
 
 
 @dataclass
