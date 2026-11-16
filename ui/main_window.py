@@ -298,9 +298,12 @@ class MainWindow(QMainWindow):
         self.dashboard_view.refresh_stats()
         self.ballistics_view.recalculate()
         self.orga_view.rebuild_joule_grid_weights()
+        self.settings_view.loaded_chips.rebuild()
+        self.pcp_view.load_inputs()
 
     def _connect_pcp_view(self):
         self.pcp_view.weight_selected.connect(self._on_weight_selected)
+        self.pcp_view.selection_changed.connect(self._on_pcp_selection_changed)
         self.pcp_view.custom_weights_changed.connect(self._on_pcp_custom_weights)
 
     def _rebuild_pcp_view(self):
@@ -323,6 +326,11 @@ class MainWindow(QMainWindow):
         else:
             self.ballistics_view.reload_environment()
 
+    def _on_pcp_selection_changed(self):
+        """A pick on the PCP page may switch type / caliber: refresh every weight list."""
+        self.settings_view.sync_weight_controls()
+        self._on_weight_type_changed(self._cfg.weight_type.value)
+
     def _on_pcp_custom_weights(self):
         self.settings_view._refresh_custom_weights_table()
         self.settings_view.loaded_chips.rebuild()
@@ -337,6 +345,7 @@ class MainWindow(QMainWindow):
         self.pcp_view.refresh_settings()
 
     def _on_weight_selected(self, weight: float):
+        self.pcp_view.load_inputs()          # a picked pellet is the PCP projectile now
         self.orga_view.set_active_weight(weight)
         self.dashboard_view.set_active_weight(weight)
         self.ballistics_view.set_active_weight(weight)

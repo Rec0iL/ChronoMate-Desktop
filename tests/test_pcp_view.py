@@ -7,7 +7,6 @@ from PySide6.QtWidgets import QApplication
 
 from core.config import ConfigManager
 from core.models import BallisticMode, Shot
-from core.pcp_presets import PCP_PRESETS
 from core.session_manager import SessionManager
 from core.i18n import I18n
 
@@ -59,12 +58,12 @@ class TestPcpView(unittest.TestCase):
         from ui.views.pcp_view import PcpView
         v = PcpView()
         idx = next(i for i in range(v.combo_projectile.count())
-                   if (v.combo_projectile.itemData(i) or ("", -1))[0] == "preset"
-                   and PCP_PRESETS[v.combo_projectile.itemData(i)[1]].name == "JSB Exact Jumbo Heavy .22")
+                   if v.combo_projectile.itemData(i) == ("pellet", "JSB Exact Jumbo Heavy .22"))
         v.combo_projectile.setCurrentIndex(idx)
         v._on_projectile_picked(idx)
         self.assertAlmostEqual(self.cfg.pcp.mass_grams, 1.175, places=3)
         self.assertAlmostEqual(self.cfg.pcp.bc, 0.033, places=3)
+        self.assertEqual(self.cfg.selected_pellet, "JSB Exact Jumbo Heavy .22")   # it's the chrono weight too
 
         v._save_as_custom()
         self.assertEqual(len(self.cfg.custom_weights), 1)

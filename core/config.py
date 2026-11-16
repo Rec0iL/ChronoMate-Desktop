@@ -54,6 +54,9 @@ class ConfigManager:
         self.weight_type: WeightType = WeightType.BB
         self.custom_weights: List[CustomWeight] = []
         self.always_show_custom_weights: bool = False
+        self.selected_pellet: str = ""            # catalogue name when a pellet is selected
+        self.diabolo_caliber: str = ".177"        # caliber filter of the Diablos list (or "ALL")
+        self.airsoft_weight_type: WeightType = WeightType.BB   # restored when leaving PCP mode
 
         self.max_allowed_joule: float = 1.50
         self.max_allowed_overhop_cm: float = 15.0
@@ -156,6 +159,12 @@ class ConfigManager:
             self.weight_type = WeightType(data.get("weight_type", WeightType.BB.value))
 
             self.always_show_custom_weights = bool(data.get("always_show_custom_weights", False))
+            self.selected_pellet = data.get("selected_pellet", "")
+            self.diabolo_caliber = data.get("diabolo_caliber", ".177")
+            try:
+                self.airsoft_weight_type = WeightType(data.get("airsoft_weight_type", WeightType.BB.value))
+            except ValueError:
+                self.airsoft_weight_type = WeightType.BB
             self.custom_weights = [
                 CustomWeight(
                     name=w.get("name", "Custom"),
@@ -216,6 +225,9 @@ class ConfigManager:
             "selected_weight": self.selected_weight,
             "weight_type": self.weight_type.value,
             "always_show_custom_weights": self.always_show_custom_weights,
+            "selected_pellet": self.selected_pellet,
+            "diabolo_caliber": self.diabolo_caliber,
+            "airsoft_weight_type": self.airsoft_weight_type.value,
             "custom_weights": [
                 {
                     "name": cw.name,

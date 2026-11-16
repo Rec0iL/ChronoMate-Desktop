@@ -21,7 +21,9 @@ from core.pcp_ballistics import (
     Atmosphere, PcpBallistics, PcpParams, PcpPoint, PcpResult, GRAIN_TO_GRAM, J_TO_FTLB, MPS_TO_FPS,
     MRAD_PER_MOA,
 )
-from core.pcp_presets import PCP_PRESETS
+from core.pellets import ALL_CALIBERS, CALIBERS, PELLETS, pellets_for
+from core.weights import WeightOption, select_option
+from core.models import WeightType
 from core.session_manager import SessionManager
 from ui.components.pcp_chart import PcpChart
 from ui.components.environment_card import EnvironmentCard
@@ -42,7 +44,8 @@ def spin(lo: float, hi: float, value: float, decimals: int = 2, step: float = 1.
 
 
 class PcpView(QWidget):
-    weight_selected = Signal(float)       # a custom weight was picked as projectile
+    weight_selected = Signal(float)       # the selected weight changed here ("save as custom")
+    selection_changed = Signal()          # a pellet / custom weight was picked: weight type, caliber, chips
     custom_weights_changed = Signal()     # "save as custom weight"
 
     def __init__(self, dark_mode: bool = True, parent=None):
@@ -275,14 +278,23 @@ class PcpView(QWidget):
 
     # --- projectile list --------------------------------------------------------------------------
     def _fill_projectiles(self):
+        """Your custom weights, then the pellet & slug catalogue grouped by caliber (same list as the
+        Diablos weight type)."""
         self.combo_projectile.blockSignals(True)
         self.combo_projectile.clear()
         self.combo_projectile.addItem(tr("pcp_pick_projectile"), None)
         for i, cw in enumerate(self._cfg.custom_weights):
             bc = f", BC {cw.bc:.3f} {cw.drag_model}" if cw.bc else ""
             self.combo_projectile.addItem(f"★ {cw.name} ({cw.weight:.3f} g{bc})", ("custom", i))
-        for i, pr in enumerate(PCP_PRESETS):
-            self.combo_projectile.addItem(f"{pr.label()}", ("preset", i))
+        model = self.combo_projectile.model()
+        for key, mm in CALIBERS:
+            self.combo_projectile.addItem(f"── {mm:g} mm ({key}) ──", None)
+            model.item(self.combo_projectile.count() - 1).setEnabled(False)
+            for p in pellets_for(key):
+                bc = f"BC ≈{p.bc:.3f} ({p.bc_model or '?'}, {p.source})" if p.bc is not None else tr("pcp_bc_unknown")
+                kind = tr("pcp_slug") if p.slug else ""
+                self.combo_projectile.addItem(f"{p.name}{kind} — {p.grains:g} gr / {p.mass_grams:.3f} g — {bc}",
+                                              ("pellet", p.name))
         self.combo_projectile.setCurrentIndex(0)
         self.combo_projectile.blockSignals(False)
 
@@ -290,29 +302,40 @@ class PcpView(QWidget):
         data = self.combo_projectile.itemData(idx)
         if not data:
             return
-        kind, i = data
-        self._loading = True
-        if kind == "preset":
-            pr = PCP_PRESETS[i]
-            self._cfg.pcp.projectile_name = pr.name
-            self.spin_mass.setValue(pr.mass_grams)
-            self.spin_caliber.setValue(pr.caliber_mm)
-            self.spin_bc.setValue(pr.bc)
-            self.combo_model.setCurrentText(pr.drag_model)
+        kind, ref = data
+        if kind == "pellet":
+            # The catalogue is the Diablos weight list: picking here selects it there too.
+            p = next(x for x in PELLETS if x.name == ref)
+            self._cfg.weight_type = WeightType.DIABLO
+            if self._cfg.diabolo_caliber != ALL_CALIBERS:
+                self._cfg.diabolo_caliber = p.caliber
+            select_option(self._cfg, WeightOption(p.mass_grams, p.name, pellet=p))
+            if p.bc is None:
+                self.lbl_preset_note.setText(tr("pcp_bc_unknown_note", p.name))
         else:
-            cw = self._cfg.custom_weights[i]
-            self._cfg.pcp.projectile_name = cw.name
-            self.spin_mass.setValue(cw.weight)
+            cw = self._cfg.custom_weights[ref]
+            select_option(self._cfg, WeightOption(cw.weight, cw.name, True))
+            pc = self._cfg.pcp
+            pc.projectile_name = cw.name
+            pc.mass_grams = cw.weight
             if cw.caliber_unit == "mm":
-                self.spin_caliber.setValue(cw.caliber)
+                pc.caliber_mm = cw.caliber
             if cw.bc:
-                self.spin_bc.setValue(cw.bc)
-                self.combo_model.setCurrentText(cw.drag_model)
-            # This is the pellet on the chrono now: energy on the Dashboard uses its weight.
-            self._cfg.selected_weight = cw.weight
-            self.weight_selected.emit(cw.weight)
+                pc.bc, pc.drag_model = cw.bc, cw.drag_model
+        self._cfg.save()
+        self.load_inputs()
+        self.selection_changed.emit()
+        self.recalculate()
+
+    def load_inputs(self):
+        """Show the PCP settings in the input fields (after a pick here or a chip elsewhere)."""
+        pc = self._cfg.pcp
+        self._loading = True
+        self.spin_mass.setValue(pc.mass_grams)
+        self.spin_caliber.setValue(pc.caliber_mm)
+        self.spin_bc.setValue(pc.bc)
+        self.combo_model.setCurrentText(pc.drag_model)
         self._loading = False
-        self._on_input()
 
     def _save_as_custom(self):
         pc = self._cfg.pcp
@@ -326,6 +349,7 @@ class PcpView(QWidget):
                                                          caliber=pc.caliber_mm, caliber_unit="mm",
                                                          bc=pc.bc, drag_model=pc.drag_model))
         self._cfg.selected_weight = round(pc.mass_grams, 3)
+        self._cfg.selected_pellet = ""
         self._cfg.save()
         self._fill_projectiles()
         self.custom_weights_changed.emit()
@@ -541,8 +565,9 @@ class PcpView(QWidget):
             self._timer.start()
 
     def refresh_settings(self):
-        """Units switch, custom weights or the weather changed elsewhere."""
+        """Units switch, weights, the selected pellet or the weather changed elsewhere."""
         self._fill_projectiles()
+        self.load_inputs()
         self.env_card.reload()
         self.recalculate()
 

@@ -43,7 +43,8 @@ from core.config import ConfigManager
 from core.session_manager import SessionManager
 from core.audio import AudioManager
 from core.i18n import tr, I18n
-from core.weights import available_weights, weight_in_list, same_weight
+from core.weights import available_weights, weight_in_list, same_weight, keep_selection_offered
+from core.pellets import CALIBERS, ALL_CALIBERS
 from ui.components.weight_chips import WeightChipBar
 
 
@@ -233,7 +234,7 @@ class SettingsView(QWidget):
         self.btn_bb.setChecked(self._cfg.weight_type == WeightType.BB)
         self.btn_bb.clicked.connect(lambda: self._set_weight_type(WeightType.BB))
 
-        self.btn_diablo = QPushButton(tr("weight_type_diablos"))
+        self.btn_diablo = QPushButton(tr("weight_type_diablos").replace("&", "&&"))
         self.btn_diablo.setCheckable(True)
         self.btn_diablo.setChecked(self._cfg.weight_type == WeightType.DIABLO)
         self.btn_diablo.clicked.connect(lambda: self._set_weight_type(WeightType.DIABLO))
@@ -247,6 +248,21 @@ class SettingsView(QWidget):
         w_type_row.addWidget(self.btn_diablo)
         w_type_row.addWidget(self.btn_custom)
         weight_layout.addLayout(w_type_row)
+
+        # Caliber filter for the Diablos list (the pellet & slug catalogue)
+        cal_row = QHBoxLayout()
+        self.lbl_caliber = QLabel(tr("diabolo_caliber_label"))
+        self.combo_caliber = QComboBox()
+        for key, mm in CALIBERS:
+            self.combo_caliber.addItem(f"{mm:g} mm ({key})", key)
+        self.combo_caliber.addItem(tr("all_calibers"), ALL_CALIBERS)
+        self.combo_caliber.setCurrentIndex(max(0, self.combo_caliber.findData(self._cfg.diabolo_caliber)))
+        self.combo_caliber.currentIndexChanged.connect(self._on_caliber_changed)
+        cal_row.addWidget(self.lbl_caliber)
+        cal_row.addWidget(self.combo_caliber)
+        cal_row.addStretch()
+        weight_layout.addLayout(cal_row)
+        self._update_caliber_visibility()
 
         # Always-show-custom switch (off = custom weights only appear with the Custom type)
         self.chk_always_custom = QCheckBox(tr("always_show_custom"))
@@ -535,14 +551,13 @@ class SettingsView(QWidget):
 
         # Keep the selected weight if the new list still offers it, else take its first weight,
         # so new shots are never stored with a weight that isn't in the list.
-        options = available_weights(self._cfg)
-        if not weight_in_list(self._cfg.selected_weight, options):
-            self._cfg.selected_weight = options[0].weight
+        keep_selection_offered(self._cfg)
 
         self._cfg.save()
         self.btn_bb.setChecked(w_type == WeightType.BB)
         self.btn_diablo.setChecked(w_type == WeightType.DIABLO)
         self.btn_custom.setChecked(w_type == WeightType.CUSTOM)
+        self._update_caliber_visibility()
         self.loaded_chips.rebuild()
 
         # Notify other views!
@@ -550,17 +565,38 @@ class SettingsView(QWidget):
 
     def _on_always_custom_toggled(self, checked: bool):
         self._cfg.always_show_custom_weights = checked
-        options = available_weights(self._cfg)
-        if not weight_in_list(self._cfg.selected_weight, options):
-            self._cfg.selected_weight = options[0].weight
+        keep_selection_offered(self._cfg)
         self._cfg.save()
         self.loaded_chips.rebuild()
         self.custom_weights_changed.emit()
 
     def _on_loaded_weight_clicked(self, weight: float):
-        self._cfg.selected_weight = weight
-        self._cfg.save()
+        # the chip bar has already stored the selection (and which pellet)
         self.weight_selected.emit(weight)
+
+    def _on_caliber_changed(self, _idx: int):
+        self._cfg.diabolo_caliber = self.combo_caliber.currentData()
+        keep_selection_offered(self._cfg)
+        self._cfg.save()
+        self.loaded_chips.rebuild()
+        self.weight_type_changed.emit(self._cfg.weight_type.value)
+
+    def sync_weight_controls(self):
+        """Show type, caliber and chips as stored (another page changed them)."""
+        t = self._cfg.weight_type
+        self.btn_bb.setChecked(t == WeightType.BB)
+        self.btn_diablo.setChecked(t == WeightType.DIABLO)
+        self.btn_custom.setChecked(t == WeightType.CUSTOM)
+        self.combo_caliber.blockSignals(True)
+        self.combo_caliber.setCurrentIndex(max(0, self.combo_caliber.findData(self._cfg.diabolo_caliber)))
+        self.combo_caliber.blockSignals(False)
+        self._update_caliber_visibility()
+        self.loaded_chips.rebuild()
+
+    def _update_caliber_visibility(self):
+        show = self._cfg.weight_type == WeightType.DIABLO
+        self.lbl_caliber.setVisible(show)
+        self.combo_caliber.setVisible(show)
 
     def set_active_weight(self, weight: float):
         self.loaded_chips.set_active(weight)
@@ -583,9 +619,7 @@ class SettingsView(QWidget):
     def _delete_custom_weight(self, index: int):
         if 0 <= index < len(self._cfg.custom_weights):
             self._cfg.custom_weights.pop(index)
-            options = available_weights(self._cfg)
-            if not weight_in_list(self._cfg.selected_weight, options):
-                self._cfg.selected_weight = options[0].weight
+            keep_selection_offered(self._cfg)
             self._cfg.save()
             self._refresh_custom_weights_table()
             self.loaded_chips.rebuild()
@@ -853,8 +887,20 @@ class SettingsView(QWidget):
         self.calibration_changed.emit(factor)
 
     def _on_bmode_changed(self, _idx: int):
-        self._cfg.ballistic_mode = BallisticMode(self.combo_bmode.currentData())
+        mode = BallisticMode(self.combo_bmode.currentData())
+        if mode == self._cfg.ballistic_mode:
+            return
+        self._cfg.ballistic_mode = mode
+        # PCP shoots pellets, not BBs: switch the weights to the Diablos catalogue, and back again.
+        if mode == BallisticMode.PCP:
+            if self._cfg.weight_type != WeightType.DIABLO:
+                self._cfg.airsoft_weight_type = self._cfg.weight_type
+            new_type = WeightType.DIABLO
+        else:
+            new_type = self._cfg.airsoft_weight_type
         self._cfg.save()
+        if new_type != self._cfg.weight_type:
+            self._set_weight_type(new_type)
         self.ballistic_mode_changed.emit(self._cfg.ballistic_mode.value)
 
     def _on_imperial_toggled(self, checked: bool):
@@ -891,3 +937,5 @@ class SettingsView(QWidget):
         self.combo_bmode.setItemText(1, tr("ballistic_mode_pcp"))
         self.lbl_bmode.setText(tr("ballistic_mode_label") + ":")
         self.chk_imperial.setText(tr("show_imperial"))
+        self.lbl_caliber.setText(tr("diabolo_caliber_label"))
+        self.combo_caliber.setItemText(self.combo_caliber.count() - 1, tr("all_calibers"))

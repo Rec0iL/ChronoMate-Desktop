@@ -19,6 +19,7 @@ os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
+from core.pellets import pellets_for
 from core.models import (
     Shot,
     WeightType,
@@ -113,18 +114,21 @@ class TestChronoMateModifications(unittest.TestCase):
     def test_weight_switching_dashboard_and_ballistics(self):
         main_win = MainWindow()
 
-        # 1. Switch to DIABLO
+        # 1. Switch to DIABLO: the pellet catalogue (default caliber filter .177)
+        self.cfg.diabolo_caliber = ".177"
         main_win.settings_view._set_weight_type(WeightType.DIABLO)
         self.assertEqual(self.cfg.weight_type, WeightType.DIABLO)
-        self.assertEqual(self.cfg.selected_weight, 0.50)
+        first = pellets_for(".177")[0]
+        self.assertAlmostEqual(self.cfg.selected_weight, first.mass_grams)
+        self.assertEqual(self.cfg.selected_pellet, first.name)
 
-        dash_chips_text = [chip.text() for chip in main_win.dashboard_view._weight_chips]
-        self.assertIn("0.50g", dash_chips_text)
-        self.assertIn("0.54g", dash_chips_text)
+        dash_chips_text = [chip.text().replace("&&", "&") for chip in main_win.dashboard_view._weight_chips]
+        self.assertIn("JSB Exact Heavy 0.670g", dash_chips_text)
+        self.assertIn("H&N Field Target Trophy 0.560g", dash_chips_text)
         self.assertNotIn("0.20g", dash_chips_text)
 
         ball_chips_text = [chip.text() for chip in main_win.ballistics_view._weight_chips]
-        self.assertIn("0.50g", ball_chips_text)
+        self.assertIn("JSB Exact Heavy 0.670g", ball_chips_text)
         self.assertNotIn("0.20g", ball_chips_text)
 
         # 2. Switch to CUSTOM

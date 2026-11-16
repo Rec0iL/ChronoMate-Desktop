@@ -38,7 +38,7 @@ from core.config import ConfigManager
 from core.session_manager import SessionManager
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
-from core.weights import available_weights
+from core.weights import available_weights, is_selected, select_option
 from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
@@ -487,7 +487,7 @@ class OrgaView(QWidget):
         layout.addWidget(self.lbl_grid_title)
 
         self.joule_grid = JouleGrid(dark_mode=dark_mode, parent=self)
-        self.joule_grid.weight_clicked.connect(self._on_grid_weight_clicked)
+        self.joule_grid.tile_clicked.connect(self._on_grid_tile_clicked)
         layout.addWidget(self.joule_grid)
         self.lbl_grid_hint = QLabel(tr("joule_grid_hint"))
         self.lbl_grid_hint.setObjectName("label_secondary")
@@ -620,19 +620,21 @@ class OrgaView(QWidget):
     def rebuild_joule_grid_weights(self):
         # Same list as the Dashboard chips; the selected weight (used for the alert sound) is marked
         # and a click on a tile selects it, so the orga picks the most common weight right here.
-        weights: List[Tuple[float, str]] = [(o.weight, o.label) for o in available_weights(self._cfg)]
+        self._grid_options = available_weights(self._cfg)
+        weights: List[Tuple[float, str]] = [(o.weight, o.label) for o in self._grid_options]
         self.joule_grid.set_weights(weights, columns=5)
-        self.joule_grid.set_selected_weight(self._cfg.selected_weight)
+        self.set_active_weight()
         self.refresh()
 
-    def _on_grid_weight_clicked(self, weight: float):
-        self._cfg.selected_weight = weight
+    def _on_grid_tile_clicked(self, index: int):
+        opt = self._grid_options[index]
+        select_option(self._cfg, opt)
         self._cfg.save()
-        self.joule_grid.set_selected_weight(weight)
-        self.weight_selected.emit(weight)
+        self.set_active_weight()
+        self.weight_selected.emit(opt.weight)
 
-    def set_active_weight(self, weight: float):
-        self.joule_grid.set_selected_weight(weight)
+    def set_active_weight(self, weight: float = None):
+        self.joule_grid.set_selected_flags([is_selected(self._cfg, o) for o in self._grid_options])
 
     def _update_joule_grid(self):
         shots = self._sm.active_session.shots

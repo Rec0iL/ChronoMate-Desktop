@@ -13,11 +13,12 @@ from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
 class JouleCard(QFrame):
-    clicked = Signal(float)
+    clicked = Signal(int)
 
-    def __init__(self, weight: float, label: str, parent=None):
+    def __init__(self, weight: float, label: str, parent=None, index: int = 0):
         super().__init__(parent)
         self.weight = weight
+        self.index = index
         self.label_text = label
         self.is_selected = False      # the weight the shots / alert sound use right now
         self.setCursor(Qt.PointingHandCursor)
@@ -44,7 +45,7 @@ class JouleCard(QFrame):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self.clicked.emit(self.weight)
+            self.clicked.emit(self.index)
         super().mouseReleaseEvent(event)
 
     def update_state(self, energy: float, practical_weight: float, dark_mode: bool):
@@ -91,7 +92,7 @@ class JouleCard(QFrame):
 
 
 class JouleGrid(QWidget):
-    weight_clicked = Signal(float)
+    tile_clicked = Signal(int)   # index into the weights given to set_weights()
 
     def __init__(self, dark_mode: bool = True, parent=None):
         super().__init__(parent)
@@ -115,8 +116,8 @@ class JouleGrid(QWidget):
         self._cards.clear()
 
         for idx, (w, label) in enumerate(weights):
-            card = JouleCard(w, label, self)
-            card.clicked.connect(self.weight_clicked)
+            card = JouleCard(w, label, self, index=idx)
+            card.clicked.connect(self.tile_clicked)
             row = idx // columns
             col = idx % columns
             self._grid_layout.addWidget(card, row, col)
@@ -129,9 +130,9 @@ class JouleGrid(QWidget):
         for c in range(columns):
             self._grid_layout.setColumnStretch(c, 1)
 
-    def set_selected_weight(self, weight: float):
-        for card in self._cards:
-            card.is_selected = abs(card.weight - weight) < 0.0005
+    def set_selected_flags(self, flags):
+        for card, flag in zip(self._cards, flags):
+            card.is_selected = bool(flag)
         self.update_velocity(self._last_velocity, self._last_limit)
 
     def update_velocity(self, velocity: float, max_allowed_joule: float):
