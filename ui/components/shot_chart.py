@@ -198,6 +198,7 @@ class ShotChart(QWidget):
             # Trend line
             line_pen = QPen(accent_color, 2.2)
             painter.setPen(line_pen)
+            painter.setBrush(Qt.NoBrush)   # else the open line path gets filled first→last point
             line_path = QPainterPath()
             line_path.moveTo(points[0])
             for pt in points[1:]:
