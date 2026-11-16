@@ -23,6 +23,7 @@ from core.config import ConfigManager
 from core.models import WeaponClass, STANDARD_BB_WEIGHTS
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
+from core.weights import available_weights
 from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
@@ -234,8 +235,10 @@ class HudDialog(QDialog):
         self.joule_layout.addWidget(self.lbl_hud_grid_title)
 
         self.hud_joule_grid = JouleGrid(dark_mode=self._dark_mode, parent=self.joule_container)
-        weights = [(weight, f"{weight:.2f}g") for weight in STANDARD_BB_WEIGHTS]
+        weights = [(o.weight, o.label) for o in available_weights(self._cfg)]
         self.hud_joule_grid.set_weights(weights, columns=10)
+        self.hud_joule_grid.set_selected_weight(self._cfg.selected_weight)
+        self.hud_joule_grid.weight_clicked.connect(self._on_hud_weight_clicked)
         self.joule_layout.addWidget(self.hud_joule_grid)
 
         self.center_layout.addWidget(self.joule_container)
@@ -297,6 +300,14 @@ class HudDialog(QDialog):
         self.lbl_hud_grid_title.setText(f"{tr('joule_grid_title')} — {name} (≤ {limit:.2f} J)")
         if hasattr(self, "hud_joule_grid"):
             self.hud_joule_grid.update_velocity(latest_vel, limit)
+
+    def _on_hud_weight_clicked(self, weight: float):
+        self._cfg.selected_weight = weight
+        self._cfg.save()
+        self.hud_joule_grid.set_selected_weight(weight)
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_on_weight_selected"):
+            parent._on_weight_selected(weight)
 
     def _toggle_mode(self):
         self._is_orga_mode = not self._is_orga_mode
@@ -478,8 +489,9 @@ class HudDialog(QDialog):
         grid_cols = 10 if w >= 1100 else 5
         if getattr(self, "_current_grid_cols", None) != grid_cols:
             self._current_grid_cols = grid_cols
-            weights = [(weight, f"{weight:.2f}g") for weight in STANDARD_BB_WEIGHTS]
+            weights = [(o.weight, o.label) for o in available_weights(self._cfg)]
             self.hud_joule_grid.set_weights(weights, columns=grid_cols)
+            self.hud_joule_grid.set_selected_weight(self._cfg.selected_weight)
             self._update_hud_joule_grid()
 
         grid_title_size = max(11, int(min(w * 0.011, h * 0.018)))

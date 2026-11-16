@@ -85,10 +85,10 @@ class BallisticsView(QWidget):
         # Probe Readout Banner
         self.probe_card = QFrame()
         self.probe_card.setObjectName("card")
-        self.probe_card.setVisible(False)
+        # Always shown (with a hint until you hover), so probing never pushes the page around
         self.probe_layout = QHBoxLayout(self.probe_card)
         self.probe_layout.setContentsMargins(14, 8, 14, 8)
-        self.lbl_probe_info = QLabel("")
+        self.lbl_probe_info = QLabel(tr("bb_probe_hint"))
         self.lbl_probe_info.setFont(QFont("Consolas, Courier New", 10, QFont.Bold))
         self.probe_layout.addWidget(self.lbl_probe_info)
         layout.addWidget(self.probe_card)
@@ -109,19 +109,21 @@ class BallisticsView(QWidget):
         self.lbl_drift = QLabel("--")
 
         items = [
-            (tr("stat_eff_range"), self.lbl_eff_range),
-            (tr("stat_max_range"), self.lbl_max_range),
-            (tr("stat_hold_over"), self.lbl_holdover),
-            (tr("stat_target_e"), self.lbl_target_energy),
-            (tr("stat_max_oh"), self.lbl_max_overhop),
-            (tr("stat_oh_dist"), self.lbl_overhop_dist),
-            (tr("stat_wind_drift"), self.lbl_drift),
+            ("stat_eff_range", self.lbl_eff_range),
+            ("stat_max_range", self.lbl_max_range),
+            ("stat_hold_over", self.lbl_holdover),
+            ("stat_target_e", self.lbl_target_energy),
+            ("stat_max_oh", self.lbl_max_overhop),
+            ("stat_oh_dist", self.lbl_overhop_dist),
+            ("stat_wind_drift", self.lbl_drift),
         ]
 
-        for idx, (title, val_lbl) in enumerate(items):
+        self._ribbon_headers = []
+        for idx, (key, val_lbl) in enumerate(items):
             col_box = QVBoxLayout()
             col_box.setSpacing(2)
-            lbl_hdr = QLabel(title)
+            lbl_hdr = QLabel(tr(key))
+            self._ribbon_headers.append((key, lbl_hdr))
             lbl_hdr.setObjectName("label_secondary")
             val_lbl.setFont(QFont("Consolas, Courier New", 12, QFont.Bold))
             col_box.addWidget(lbl_hdr)
@@ -299,14 +301,13 @@ class BallisticsView(QWidget):
 
     def _on_probe_updated(self, probe: Optional[ProbeResult]):
         if probe:
-            self.probe_card.setVisible(True)
             self.lbl_probe_info.setText(
                 f"PROBE @ {probe.distance:.1f}m | H: {probe.bb_height_cm:.1f}cm | E: {probe.energy_j:.2f}J | "
                 f"T: {probe.time_s:.2f}s | Rel: {probe.relative_impact_cm:+.1f}cm | Holdover: {probe.hold_over_cm:+.1f}cm"
                 + (f" | {tr('stat_wind_drift')}: {self._drift_text(probe.drift_cm)}" if abs(probe.drift_cm) >= 0.05 else "")
             )
         else:
-            self.probe_card.setVisible(False)
+            self.lbl_probe_info.setText(tr("bb_probe_hint"))
 
     def recalculate(self):
         eye_height_m = self._shooter_height_m + (self._sight_height_cm / 100.0)
@@ -388,5 +389,9 @@ class BallisticsView(QWidget):
         self.lbl_max_oh_limit.setText(tr("max_overhop", self._cfg.max_allowed_overhop_cm))
         self.btn_optimize.setText(f"★ {tr('optimize_hopup')}")
         self.lbl_attr.setText(tr("powered_by"))
+        for key, lbl in self._ribbon_headers:
+            lbl.setText(tr(key))
+        self.env_card.retranslate()
+        self.lbl_probe_info.setText(tr("bb_probe_hint"))
         self.rebuild_weight_chips()
         self.recalculate()

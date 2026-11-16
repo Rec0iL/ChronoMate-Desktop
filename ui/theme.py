@@ -228,6 +228,13 @@ class Theme:
                     color: {cls.DARK_ACCENT_PRIMARY};
                     font-weight: 700;
                 }}
+                /* Small icon buttons in table rows (✕, ▲, ▼): no padding, or the glyph is pushed out */
+                QPushButton[compact="true"] {{
+                    padding: 0px;
+                    min-width: 0px;
+                    font-size: 13px;
+                }}
+
                 /* Custom weights among the chips get a dashed outline */
                 QPushButton#chip_btn[custom="true"] {{
                     border-style: dashed;
@@ -439,6 +446,13 @@ class Theme:
                     color: {cls.LIGHT_ACCENT_PRIMARY};
                     font-weight: 700;
                 }}
+                /* Small icon buttons in table rows (✕, ▲, ▼): no padding, or the glyph is pushed out */
+                QPushButton[compact="true"] {{
+                    padding: 0px;
+                    min-width: 0px;
+                    font-size: 13px;
+                }}
+
                 /* Custom weights among the chips get a dashed outline */
                 QPushButton#chip_btn[custom="true"] {{
                     border-style: dashed;

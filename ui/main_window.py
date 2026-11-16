@@ -204,10 +204,10 @@ class MainWindow(QMainWindow):
         self.dashboard_view.weight_changed.connect(self._on_weight_selected)
         self.ballistics_view.weight_changed.connect(self._on_weight_selected)
         self.history_view.session_changed.connect(self._on_session_changed)
-        self.pcp_view.weight_selected.connect(self._on_weight_selected)
-        self.pcp_view.custom_weights_changed.connect(self._on_pcp_custom_weights)
+        self._connect_pcp_view()
+        self.orga_view.weight_selected.connect(self._on_weight_selected)
         self.settings_view.ballistic_mode_changed.connect(self._apply_ballistic_mode)
-        self.settings_view.units_changed.connect(self.pcp_view.refresh_settings)
+        self.settings_view.units_changed.connect(lambda: self.pcp_view.refresh_settings())
         self._apply_ballistic_mode(self._cfg.ballistic_mode.value)
 
         self.stack.addWidget(self.dashboard_view)
@@ -297,7 +297,24 @@ class MainWindow(QMainWindow):
         self.ballistics_view.rebuild_weight_chips()
         self.dashboard_view.refresh_stats()
         self.ballistics_view.recalculate()
-        self.orga_view.refresh()
+        self.orga_view.rebuild_joule_grid_weights()
+
+    def _connect_pcp_view(self):
+        self.pcp_view.weight_selected.connect(self._on_weight_selected)
+        self.pcp_view.custom_weights_changed.connect(self._on_pcp_custom_weights)
+
+    def _rebuild_pcp_view(self):
+        """The PCP page builds all its texts once; a new language means a fresh page.
+        Its inputs live in the settings, so nothing is lost."""
+        old = self.pcp_view
+        was_current = self.trajectory_stack.currentWidget() is old
+        self.pcp_view = PcpView(dark_mode=self._cfg.is_dark_mode, parent=self)
+        self._connect_pcp_view()
+        self.trajectory_stack.insertWidget(1, self.pcp_view)
+        self.trajectory_stack.removeWidget(old)
+        old.deleteLater()
+        if was_current:
+            self.trajectory_stack.setCurrentWidget(self.pcp_view)
 
     def _apply_ballistic_mode(self, mode: str):
         self.trajectory_stack.setCurrentWidget(self.pcp_view if mode == BallisticMode.PCP.value else self.ballistics_view)
@@ -316,10 +333,11 @@ class MainWindow(QMainWindow):
         self.ballistics_view.rebuild_weight_chips()
         self.dashboard_view.refresh_stats()
         self.ballistics_view.recalculate()
-        self.orga_view.refresh()
+        self.orga_view.rebuild_joule_grid_weights()
         self.pcp_view.refresh_settings()
 
     def _on_weight_selected(self, weight: float):
+        self.orga_view.set_active_weight(weight)
         self.dashboard_view.set_active_weight(weight)
         self.ballistics_view.set_active_weight(weight)
         self.settings_view.set_active_weight(weight)
@@ -396,6 +414,7 @@ class MainWindow(QMainWindow):
         self.dashboard_view.retranslate()
         self.orga_view.retranslate()
         self.ballistics_view.retranslate()
+        self._rebuild_pcp_view()
         self.history_view.retranslate()
         self.export_view.retranslate()
         self._navigate_to(self.stack.currentIndex())

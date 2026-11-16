@@ -6,17 +6,22 @@ Green = Safe, Orange = Practical Limit, Red = Over Limit / Illegal.
 
 from typing import List, Tuple
 from PySide6.QtWidgets import QWidget, QFrame, QVBoxLayout, QGridLayout, QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor
 from core.i18n import tr
 from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
 class JouleCard(QFrame):
+    clicked = Signal(float)
+
     def __init__(self, weight: float, label: str, parent=None):
         super().__init__(parent)
         self.weight = weight
         self.label_text = label
+        self.is_selected = False      # the weight the shots / alert sound use right now
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip(tr("joule_tile_tooltip"))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -33,11 +38,18 @@ class JouleCard(QFrame):
 
         layout.addWidget(self.lbl_weight)
         layout.addWidget(self.lbl_joules)
+        reserve_text_space(self.lbl_weight, [label, f"★ {label}"])
         reserve_text_space(self.lbl_joules, ["-- J", "88.88 J"])
         self.update_state(0.0, 0.0, True)
 
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit(self.weight)
+        super().mouseReleaseEvent(event)
+
     def update_state(self, energy: float, practical_weight: float, dark_mode: bool):
         self.lbl_joules.setText(f"{energy:.2f} J" if energy > 0 else "-- J")
+        self.lbl_weight.setText(f"★ {self.label_text}" if self.is_selected else self.label_text)
 
         if energy <= 0:
             bg = "#161B22" if dark_mode else "#ECEFF1"
@@ -66,7 +78,7 @@ class JouleCard(QFrame):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {bg};
-                border: 1.5px solid {border};
+                border: {"3.5px" if self.is_selected else "1.5px"} solid {border};
                 border-radius: 8px;
             }}
             QLabel {{
@@ -79,6 +91,8 @@ class JouleCard(QFrame):
 
 
 class JouleGrid(QWidget):
+    weight_clicked = Signal(float)
+
     def __init__(self, dark_mode: bool = True, parent=None):
         super().__init__(parent)
         self._dark_mode = dark_mode
@@ -86,6 +100,8 @@ class JouleGrid(QWidget):
         self._grid_layout.setContentsMargins(0, 0, 0, 0)
         self._grid_layout.setSpacing(10)
         self._cards: List[JouleCard] = []
+        self._last_velocity = 0.0
+        self._last_limit = 1.5
 
     def set_weights(self, weights: List[Tuple[float, str]], columns: int = 5):
         # Clear existing
@@ -100,6 +116,7 @@ class JouleGrid(QWidget):
 
         for idx, (w, label) in enumerate(weights):
             card = JouleCard(w, label, self)
+            card.clicked.connect(self.weight_clicked)
             row = idx // columns
             col = idx % columns
             self._grid_layout.addWidget(card, row, col)
@@ -112,7 +129,13 @@ class JouleGrid(QWidget):
         for c in range(columns):
             self._grid_layout.setColumnStretch(c, 1)
 
+    def set_selected_weight(self, weight: float):
+        for card in self._cards:
+            card.is_selected = abs(card.weight - weight) < 0.0005
+        self.update_velocity(self._last_velocity, self._last_limit)
+
     def update_velocity(self, velocity: float, max_allowed_joule: float):
+        self._last_velocity, self._last_limit = velocity, max_allowed_joule
         if not self._cards:
             return
 

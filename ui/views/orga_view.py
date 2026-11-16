@@ -38,6 +38,7 @@ from core.config import ConfigManager
 from core.session_manager import SessionManager
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
+from core.weights import available_weights
 from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
@@ -403,6 +404,8 @@ class ClassComplianceCard(QFrame):
 
 
 class OrgaView(QWidget):
+    weight_selected = Signal(float)
+
     def __init__(self, dark_mode: bool = True, parent=None):
         super().__init__(parent)
         self._dark_mode = dark_mode
@@ -484,7 +487,11 @@ class OrgaView(QWidget):
         layout.addWidget(self.lbl_grid_title)
 
         self.joule_grid = JouleGrid(dark_mode=dark_mode, parent=self)
+        self.joule_grid.weight_clicked.connect(self._on_grid_weight_clicked)
         layout.addWidget(self.joule_grid)
+        self.lbl_grid_hint = QLabel(tr("joule_grid_hint"))
+        self.lbl_grid_hint.setObjectName("label_secondary")
+        layout.addWidget(self.lbl_grid_hint)
         self.rebuild_joule_grid_weights()
         self.rebuild_compliance_cards()
 
@@ -611,10 +618,21 @@ class OrgaView(QWidget):
             self.rebuild_compliance_cards()
 
     def rebuild_joule_grid_weights(self):
-        # Orga view shows all weights (all standard weights 0.20g to 0.45g) so marshals have the complete spectrum
-        weights: List[Tuple[float, str]] = [(w, f"{w:.2f}g") for w in STANDARD_BB_WEIGHTS]
+        # Same list as the Dashboard chips; the selected weight (used for the alert sound) is marked
+        # and a click on a tile selects it, so the orga picks the most common weight right here.
+        weights: List[Tuple[float, str]] = [(o.weight, o.label) for o in available_weights(self._cfg)]
         self.joule_grid.set_weights(weights, columns=5)
+        self.joule_grid.set_selected_weight(self._cfg.selected_weight)
         self.refresh()
+
+    def _on_grid_weight_clicked(self, weight: float):
+        self._cfg.selected_weight = weight
+        self._cfg.save()
+        self.joule_grid.set_selected_weight(weight)
+        self.weight_selected.emit(weight)
+
+    def set_active_weight(self, weight: float):
+        self.joule_grid.set_selected_weight(weight)
 
     def _update_joule_grid(self):
         shots = self._sm.active_session.shots
@@ -653,6 +671,7 @@ class OrgaView(QWidget):
         self.btn_add_class.setText(tr("add_weapon_class"))
         self.lbl_v_hdr.setText(tr("measured_velocity"))
         self.lbl_compliance_hdr.setText(tr("compliance_board_title"))
+        self.lbl_grid_hint.setText(tr("joule_grid_hint"))
         self.rebuild_compliance_cards()
         self.rebuild_joule_grid_weights()
         self._update_joule_grid()

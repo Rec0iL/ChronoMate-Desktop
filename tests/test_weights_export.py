@@ -115,3 +115,30 @@ class TestWeightsAndExport(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestJouleGridSelection(unittest.TestCase):
+    """The Orga Joule grid shows the chips' weight list, marks the selected weight, click selects."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication(sys.argv)
+
+    def test_grid_follows_and_sets_selected_weight(self):
+        from ui.main_window import MainWindow
+        cfg = ConfigManager.get_instance()
+        cfg.weight_type = WeightType.BB
+        cfg.selected_weight = 0.20
+        cfg.always_show_custom_weights = True
+        cfg.custom_weights = [CustomWeight("Bio", 0.27)]
+        w = MainWindow()
+        w.poller.stop()
+        cards = w.orga_view.joule_grid._cards
+        self.assertEqual([c.weight for c in cards], STANDARD_BB_WEIGHTS + [0.27])
+        self.assertEqual([c.weight for c in cards if c.is_selected], [0.20])
+        cards[2].clicked.emit(cards[2].weight)                 # click the 0.25 g tile
+        self.assertAlmostEqual(cfg.selected_weight, 0.25)
+        self.assertEqual([c.text() for c in w.dashboard_view._weight_chips if c.isChecked()], ["0.25g"])
+        w.dashboard_view.weight_bar.weight_clicked.emit(0.30)  # and the other way round
+        self.assertEqual([c.weight for c in w.orga_view.joule_grid._cards if c.is_selected], [0.30])
+        w.close()

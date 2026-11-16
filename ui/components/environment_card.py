@@ -33,9 +33,9 @@ class EnvironmentCard(QFrame):
         g = QGridLayout(self)
         g.setContentsMargins(14, 12, 14, 12)
         g.setVerticalSpacing(8)
-        title = QLabel(tr("pcp_card_environment"))
-        title.setObjectName("section_title")
-        g.addWidget(title, 0, 0, 1, 2)
+        self.lbl_title = QLabel(tr("pcp_card_environment"))
+        self.lbl_title.setObjectName("section_title")
+        g.addWidget(self.lbl_title, 0, 0, 1, 2)
 
         self.spin_temp = _spin(-30.0, 50.0, env.temperature_c, 1, 1.0, "°C")
         self.chk_altitude = QCheckBox(tr("pcp_use_altitude"))
@@ -60,11 +60,11 @@ class EnvironmentCard(QFrame):
                 self._labels[key] = lbl
                 g.addWidget(lbl, i, 0)
                 g.addWidget(w, i, 1)
-        if show_hint:
-            hint = QLabel(tr("pcp_wind_hint"))
-            hint.setObjectName("label_secondary")
-            hint.setWordWrap(True)
-            g.addWidget(hint, len(rows) + 1, 0, 1, 2)
+        self.lbl_hint = QLabel(tr("pcp_wind_hint"))
+        self.lbl_hint.setObjectName("label_secondary")
+        self.lbl_hint.setWordWrap(True)
+        self.lbl_hint.setVisible(show_hint)
+        g.addWidget(self.lbl_hint, len(rows) + 1, 0, 1, 2)
 
         for w in (self.spin_temp, self.spin_pressure, self.spin_altitude, self.spin_humidity,
                   self.spin_wind, self.spin_clock):
@@ -109,3 +109,11 @@ class EnvironmentCard(QFrame):
         for w in widgets:
             w.blockSignals(False)
         self._update_visibility()
+
+    def retranslate(self):
+        self.lbl_title.setText(tr("pcp_card_environment"))
+        for key, lbl in self._labels.items():
+            lbl.setText(tr(key))
+        self.chk_altitude.setText(tr("pcp_use_altitude"))
+        self.lbl_hint.setText(tr("pcp_wind_hint"))
+        self.spin_clock.setSuffix(f" {tr('pcp_oclock')}")

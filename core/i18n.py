@@ -239,6 +239,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "ballistic_mode_pcp": "PCP airgun (pellet & slug)",
         "show_imperial": "Also show imperial units (fps, ft-lb, grains, yards)",
         "stat_wind_drift": "WIND DRIFT",
+        "move_up": "Move up",
+        "move_down": "Move down",
+        "bb_probe_hint": "PROBE — hover the side view · click to pin · right-click to clear",
+        "joule_tile_tooltip": "Click to use this weight (shots and the over-limit sound use it)",
+        "joule_grid_hint": "★ = selected weight (used for shots and the over-limit sound) · click a tile to select it",
     },
     "de": {
         "app_name": "ChronoMate",
@@ -472,6 +477,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "ballistic_mode_pcp": "PCP-Luftgewehr (Diabolo & Slug)",
         "show_imperial": "Zusätzlich imperiale Einheiten (fps, ft-lb, Grain, Yards)",
         "stat_wind_drift": "WINDABDRIFT",
+        "move_up": "Nach oben",
+        "move_down": "Nach unten",
+        "bb_probe_hint": "MESSPUNKT — über die Seitenansicht fahren · Klick hält fest · Rechtsklick löscht",
+        "joule_tile_tooltip": "Klicken = dieses Gewicht verwenden (Schüsse und Warnton nutzen es)",
+        "joule_grid_hint": "★ = gewähltes Gewicht (für Schüsse und Warnton) · Kachel anklicken zum Auswählen",
     },
 }
 

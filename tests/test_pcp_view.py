@@ -39,6 +39,22 @@ class TestPcpView(unittest.TestCase):
         self.assertIs(w.trajectory_stack.currentWidget(), w.ballistics_view)
         w.close()
 
+    def test_language_switch_reaches_pcp_and_weather(self):
+        from ui.main_window import MainWindow
+        from core.i18n import TRANSLATIONS
+        w = MainWindow()
+        w.poller.stop()
+        w.settings_view.combo_bmode.setCurrentIndex(1)            # PCP
+        w.settings_view.combo_lang.setCurrentIndex(w.settings_view.combo_lang.findData("de"))
+        self.assertEqual(w.pcp_view.lbl_title.text(), TRANSLATIONS["de"]["pcp_title"])
+        self.assertEqual(w.pcp_view.env_card.lbl_title.text(), TRANSLATIONS["de"]["pcp_card_environment"])
+        self.assertEqual(w.ballistics_view.env_card.lbl_title.text(), TRANSLATIONS["de"]["pcp_card_environment"])
+        self.assertIs(w.trajectory_stack.currentWidget(), w.pcp_view)
+        self.assertEqual(w.settings_view.chk_always_custom.text(), TRANSLATIONS["de"]["always_show_custom"])
+        w.settings_view.combo_lang.setCurrentIndex(w.settings_view.combo_lang.findData("en"))
+        w.settings_view.combo_bmode.setCurrentIndex(0)
+        w.close()
+
     def test_preset_save_and_bc_tool(self):
         from ui.views.pcp_view import PcpView
         v = PcpView()

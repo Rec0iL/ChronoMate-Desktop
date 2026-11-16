@@ -396,7 +396,8 @@ class SettingsView(QWidget):
         self.chk_imperial = QCheckBox(tr("show_imperial"))
         self.chk_imperial.setChecked(self._cfg.show_imperial)
         self.chk_imperial.toggled.connect(self._on_imperial_toggled)
-        phys_layout.addWidget(QLabel(tr("ballistic_mode_label") + ":"), 7, 0)
+        self.lbl_bmode = QLabel(tr("ballistic_mode_label") + ":")
+        phys_layout.addWidget(self.lbl_bmode, 7, 0)
         phys_layout.addWidget(self.combo_bmode, 7, 1)
         phys_layout.addWidget(self.chk_imperial, 8, 0, 1, 2)
 
@@ -590,6 +591,16 @@ class SettingsView(QWidget):
             self.loaded_chips.rebuild()
             self.custom_weights_changed.emit()
 
+    def _move_custom_weight(self, index: int, step: int):
+        cws = self._cfg.custom_weights
+        j = index + step
+        if 0 <= index < len(cws) and 0 <= j < len(cws):
+            cws[index], cws[j] = cws[j], cws[index]
+            self._cfg.save()
+            self._refresh_custom_weights_table()
+            self.loaded_chips.rebuild()
+            self.custom_weights_changed.emit()
+
     def _on_custom_cell_changed(self, row: int, col: int):
         """Typing into the custom weights table is saved (name, weight, caliber)."""
         if not (0 <= row < len(self._cfg.custom_weights)) or col > 2:
@@ -632,11 +643,26 @@ class SettingsView(QWidget):
             self.custom_table.setItem(idx, 1, QTableWidgetItem(f"{cw.weight:.2f}"))
             self.custom_table.setItem(idx, 2, QTableWidgetItem(f"{cw.caliber:.2f}"))
 
-            btn_del = QPushButton("✕")
-            btn_del.setFixedWidth(28)
-            btn_del.setObjectName("danger_btn")
-            btn_del.clicked.connect(lambda _, i=idx: self._delete_custom_weight(i))
-            self.custom_table.setCellWidget(idx, 3, btn_del)
+            # ▲ / ▼ sort the custom weights (the chips follow this order), ✕ deletes
+            act = QWidget()
+            act_l = QHBoxLayout(act)
+            act_l.setContentsMargins(2, 1, 2, 1)
+            act_l.setSpacing(4)
+            for text, tip, slot, enabled, danger in (
+                ("▲", tr("move_up"), lambda _, i=idx: self._move_custom_weight(i, -1), idx > 0, False),
+                ("▼", tr("move_down"), lambda _, i=idx: self._move_custom_weight(i, +1), idx < len(self._cfg.custom_weights) - 1, False),
+                ("✕", tr("delete"), lambda _, i=idx: self._delete_custom_weight(i), True, True),
+            ):
+                b = QPushButton(text)
+                b.setProperty("compact", "true")
+                if danger:
+                    b.setObjectName("danger_btn")
+                b.setFixedSize(26, 24)
+                b.setToolTip(tip)
+                b.setEnabled(enabled)
+                b.clicked.connect(slot)
+                act_l.addWidget(b)
+            self.custom_table.setCellWidget(idx, 3, act)
 
     # --- Calibration System ---
     def _toggle_calibration_recording(self):
@@ -786,6 +812,7 @@ class SettingsView(QWidget):
             btn_del = QPushButton("✕")
             btn_del.setFixedSize(24, 24)
             btn_del.setObjectName("danger_btn")
+            btn_del.setProperty("compact", "true")
             btn_del.clicked.connect(lambda _, i=idx: self._delete_cal_entry(i))
 
             act_layout.addWidget(btn_set_ref)
@@ -851,3 +878,16 @@ class SettingsView(QWidget):
         self.btn_clear_cal.setText(tr("clear_calibration"))
         self.lbl_factor.setText(tr("comp_factor_display", self._cfg.get_compensation_factor()))
         self.refresh_calibration_table()
+        # Weights, ballistic model and units (added later; keep them in the user's language too)
+        self.chk_always_custom.setText(tr("always_show_custom"))
+        self.chk_always_custom.setToolTip(tr("always_show_custom_desc"))
+        self.lbl_loaded.setText(tr("loaded_weights"))
+        self.lbl_custom_list.setText(tr("custom_weights_list"))
+        self.custom_table.setHorizontalHeaderLabels([
+            tr("custom_col_name"), tr("custom_col_weight"), tr("custom_col_caliber"), tr("custom_col_action")
+        ])
+        self._refresh_custom_weights_table()
+        self.combo_bmode.setItemText(0, tr("ballistic_mode_airsoft"))
+        self.combo_bmode.setItemText(1, tr("ballistic_mode_pcp"))
+        self.lbl_bmode.setText(tr("ballistic_mode_label") + ":")
+        self.chk_imperial.setText(tr("show_imperial"))
