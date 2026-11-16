@@ -23,7 +23,6 @@ from core.weights import (
     KIND_BB, KIND_PELLET, active_ids, add_to_active, available_weights, delete_own, keep_selection_offered,
     library, mode_kind, move_active, new_own_id, normalize_active, own_by_id, remove_from_active, resolve,
 )
-from ui.components.weight_chips import WeightChipBar
 
 
 def _amp(text: str) -> str:
@@ -120,28 +119,24 @@ class ProjectilesCard(QFrame):
         self.lbl_mode_hint.setWordWrap(True)
         lay.addWidget(self.lbl_mode_hint)
 
-        # Chips: pick the weight shots are recorded with
-        self.lbl_chips = QLabel()
-        self.lbl_chips.setObjectName("label_secondary")
-        lay.addWidget(self.lbl_chips)
-        self.chips = WeightChipBar(self)
-        self.chips.weight_clicked.connect(self._on_chip)
-        lay.addWidget(self.chips)
-
         # Active list | library
-        lists = QGridLayout()
-        lists.setHorizontalSpacing(14)
         self.lbl_active = QLabel()
         self.lbl_active.setObjectName("section_title")
-        self.lbl_library = QLabel()
-        self.lbl_library.setObjectName("section_title")
-        lists.addWidget(self.lbl_active, 0, 0)
-        lists.addWidget(self.lbl_library, 0, 1)
-
+        lay.addWidget(self.lbl_active)
         self.list_active = QListWidget()
         self.list_active.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.list_active.setMinimumHeight(260)
-        lists.addWidget(self.list_active, 1, 0, 2, 1)
+        self.list_active.setMinimumHeight(220)
+        lay.addWidget(self.list_active)
+
+        # Library, collapsed behind a chevron: the active list is what you work with
+        self.btn_library = QPushButton()
+        self.btn_library.setCheckable(True)
+        self.btn_library.setObjectName("expander_btn")
+        self.btn_library.toggled.connect(self._toggle_library)
+        lay.addWidget(self.btn_library)
+        self.library_box = QWidget()
+        lists = QGridLayout(self.library_box)
+        lists.setContentsMargins(0, 0, 0, 0)
 
         lib_filter = QHBoxLayout()
         self.edit_search = QLineEdit()
@@ -155,14 +150,13 @@ class ProjectilesCard(QFrame):
         self.combo_caliber.currentIndexChanged.connect(self._on_caliber_changed)
         lib_filter.addWidget(self.edit_search, 1)
         lib_filter.addWidget(self.combo_caliber)
-        lists.addLayout(lib_filter, 1, 1)
+        lists.addLayout(lib_filter, 0, 0)
         self.list_library = QListWidget()
         self.list_library.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.list_library.setMinimumHeight(220)
-        lists.addWidget(self.list_library, 2, 1)
-        lists.setColumnStretch(0, 1)
-        lists.setColumnStretch(1, 1)
-        lay.addLayout(lists)
+        self.list_library.setMinimumHeight(260)
+        lists.addWidget(self.list_library, 1, 0)
+        self.library_box.setVisible(False)
+        lay.addWidget(self.library_box)
 
         self.btn_new_own = QPushButton()
         self.btn_new_own.clicked.connect(self._new_own)
@@ -193,7 +187,6 @@ class ProjectilesCard(QFrame):
     def refresh(self):
         normalize_active(self._cfg)
         self._update_mode_buttons()
-        self.chips.rebuild()
         self._fill_active()
         self._fill_library()
 
@@ -308,24 +301,28 @@ class ProjectilesCard(QFrame):
             delete_own(self._cfg, cw.id)
             self._changed()
 
+    def _toggle_library(self, open_: bool):
+        self.library_box.setVisible(open_)
+        self._update_library_button()
+
+    def _update_library_button(self):
+        arrow = "▾" if self.btn_library.isChecked() else "▸"
+        self.btn_library.setText(f"{arrow}  {tr('library_title')}")
+
     def _on_caliber_changed(self, _idx: int):
         self._cfg.library_caliber = self.combo_caliber.currentData()
         self._cfg.save()
         self._fill_library()
 
-    def _on_chip(self, weight: float):
-        self.weight_selected.emit(weight)
-
     def set_active_weight(self, _weight: float = None):
-        self.chips.set_active()
+        pass   # the weight is picked on Dashboard / Orga / Trajectory, not here
 
     def retranslate(self):
         self.lbl_title.setText(tr("projectiles_title"))
         self.btn_airsoft.setText(_amp(tr("mode_airsoft")))
         self.btn_pcp.setText(_amp(tr("mode_pcp")))
-        self.lbl_chips.setText(tr("loaded_weights"))
         self.lbl_active.setText(tr("active_list_title"))
-        self.lbl_library.setText(tr("library_title"))
+        self._update_library_button()
         self.edit_search.setPlaceholderText(tr("library_search"))
         self.combo_caliber.setItemText(self.combo_caliber.count() - 1, tr("all_calibers"))
         self.btn_new_own.setText(f"+ {tr('own_projectile_new')}")

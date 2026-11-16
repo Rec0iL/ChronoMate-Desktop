@@ -31,6 +31,7 @@ from ui.components.trajectory_canvas import TrajectoryCanvas
 from ui.components.target_canvas import TargetCanvas
 from ui.components.weight_chips import WeightChipBar
 from ui.components.environment_card import EnvironmentCard
+from ui.components.responsive import ResponsiveGrid, ResponsiveRow
 
 
 class BallisticsView(QWidget):
@@ -57,6 +58,7 @@ class BallisticsView(QWidget):
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)   # the page fits the window
 
         container = QWidget()
         layout = QVBoxLayout(container)
@@ -68,18 +70,17 @@ class BallisticsView(QWidget):
         self.lbl_title.setObjectName("page_title")
         layout.addWidget(self.lbl_title)
 
-        # Canvases Container (Side-by-Side Splitter)
-        self.canvas_splitter = QSplitter(Qt.Horizontal)
-        self.canvas_splitter.setChildrenCollapsible(False)
+        # Side view and target view: side by side when wide, stacked on narrow windows
+        self.canvas_splitter = ResponsiveRow(threshold=860)
 
         self.trajectory_canvas = TrajectoryCanvas(dark_mode=dark_mode, parent=self)
         self.trajectory_canvas.probe_updated.connect(self._on_probe_updated)
         self.target_canvas = TargetCanvas(dark_mode=dark_mode, parent=self)
 
-        self.canvas_splitter.addWidget(self.trajectory_canvas)
-        self.canvas_splitter.addWidget(self.target_canvas)
-        self.canvas_splitter.setStretchFactor(0, 3)
-        self.canvas_splitter.setStretchFactor(1, 2)
+        self.trajectory_canvas.setMinimumHeight(300)
+        self.target_canvas.setMinimumHeight(300)
+        self.canvas_splitter.add_widget(self.trajectory_canvas, 3)
+        self.canvas_splitter.add_widget(self.target_canvas, 2)
         layout.addWidget(self.canvas_splitter)
 
         # Probe Readout Banner
@@ -90,15 +91,17 @@ class BallisticsView(QWidget):
         self.probe_layout.setContentsMargins(14, 8, 14, 8)
         self.lbl_probe_info = QLabel(tr("bb_probe_hint"))
         self.lbl_probe_info.setFont(QFont("Consolas, Courier New", 10, QFont.Bold))
+        self.lbl_probe_info.setWordWrap(True)
         self.probe_layout.addWidget(self.lbl_probe_info)
         layout.addWidget(self.probe_card)
 
         # Telemetry Stats Ribbon Card
         stats_ribbon = QFrame()
         stats_ribbon.setObjectName("card")
-        ribbon_layout = QGridLayout(stats_ribbon)
-        ribbon_layout.setContentsMargins(14, 10, 14, 10)
-        ribbon_layout.setSpacing(10)
+        ribbon_outer = QVBoxLayout(stats_ribbon)
+        ribbon_outer.setContentsMargins(14, 10, 14, 10)
+        ribbon_grid = ResponsiveGrid(min_col_width=120, max_cols=7, min_cols=2, spacing=10)
+        ribbon_outer.addWidget(ribbon_grid)
 
         self.lbl_eff_range = QLabel("--")
         self.lbl_max_range = QLabel("--")
@@ -120,7 +123,9 @@ class BallisticsView(QWidget):
 
         self._ribbon_headers = []
         for idx, (key, val_lbl) in enumerate(items):
-            col_box = QVBoxLayout()
+            cell = QWidget()
+            col_box = QVBoxLayout(cell)
+            col_box.setContentsMargins(0, 0, 0, 0)
             col_box.setSpacing(2)
             lbl_hdr = QLabel(tr(key))
             self._ribbon_headers.append((key, lbl_hdr))
@@ -128,7 +133,7 @@ class BallisticsView(QWidget):
             val_lbl.setFont(QFont("Consolas, Courier New", 12, QFont.Bold))
             col_box.addWidget(lbl_hdr)
             col_box.addWidget(val_lbl)
-            ribbon_layout.addLayout(col_box, 0, idx)
+            ribbon_grid.add_widget(cell)
 
         layout.addWidget(stats_ribbon)
 

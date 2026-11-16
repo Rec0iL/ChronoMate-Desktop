@@ -5,7 +5,7 @@ Green = Safe, Orange = Practical Limit, Red = Over Limit / Illegal.
 """
 
 from typing import List, Tuple
-from PySide6.QtWidgets import QWidget, QFrame, QVBoxLayout, QGridLayout, QLabel
+from PySide6.QtWidgets import QWidget, QFrame, QVBoxLayout, QGridLayout, QLabel, QLayout, QSizePolicy
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QColor
 from core.i18n import tr
@@ -100,9 +100,41 @@ class JouleGrid(QWidget):
         self._grid_layout = QGridLayout(self)
         self._grid_layout.setContentsMargins(0, 0, 0, 0)
         self._grid_layout.setSpacing(10)
+        # Fewer columns on narrow windows: the grid itself must not force its full width
+        self._grid_layout.setSizeConstraint(QLayout.SetNoConstraint)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._cards: List[JouleCard] = []
         self._last_velocity = 0.0
         self._last_limit = 1.5
+        self._max_cols = 5
+        self._shown_cols = 5
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._cards and self._fit_columns() != self._shown_cols:
+            self._place()
+
+    def _fit_columns(self) -> int:
+        if not self._cards or self.width() <= 0:
+            return self._max_cols
+        spacing = self._grid_layout.spacing()
+        cell = self._cards[0].minimumWidth() + spacing
+        return max(1, min(self._max_cols, (self.width() + spacing) // max(1, cell)))
+
+    def _place(self):
+        cols = self._fit_columns()
+        self._shown_cols = cols
+        for card in self._cards:
+            self._grid_layout.removeWidget(card)
+        for idx, card in enumerate(self._cards):
+            self._grid_layout.addWidget(card, idx // cols, idx % cols)
+        for c in range(max(self._grid_layout.columnCount(), self._max_cols)):
+            self._grid_layout.setColumnStretch(c, 1 if c < cols else 0)
+        if self._cards:
+            rows = (len(self._cards) + cols - 1) // cols
+            h = max(c.sizeHint().height() for c in self._cards)
+            self.setMinimumHeight(rows * h + (rows - 1) * self._grid_layout.spacing())
+            self.setMinimumWidth(self._cards[0].minimumWidth())
 
     def set_weights(self, weights: List[Tuple[float, str]], columns: int = 5):
         # Clear existing
@@ -125,10 +157,8 @@ class JouleGrid(QWidget):
 
         # Equal, content-independent columns: "-- J" → "1.23 J" must not move anything.
         equalize_widths(self._cards)
-        for c in range(self._grid_layout.columnCount()):
-            self._grid_layout.setColumnStretch(c, 0)
-        for c in range(columns):
-            self._grid_layout.setColumnStretch(c, 1)
+        self._max_cols = columns
+        self._place()
 
     def set_selected_flags(self, flags):
         for card, flag in zip(self._cards, flags):

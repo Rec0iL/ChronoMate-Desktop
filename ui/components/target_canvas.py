@@ -38,6 +38,13 @@ class TargetCanvas(QWidget):
 
         self.update()
 
+    def set_impact(self, target_distance: float, relative_impact_cm: float, drift_cm: float):
+        """Show a hit directly (used by the PCP page: drop vs. line of sight and wind drift)."""
+        self._target_distance = target_distance
+        self._relative_impact_cm = relative_impact_cm
+        self._drift_cm = drift_cm
+        self.update()
+
     def set_theme(self, dark_mode: bool):
         self._dark_mode = dark_mode
         self.update()

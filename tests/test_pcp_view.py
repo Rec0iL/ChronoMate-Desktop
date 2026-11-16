@@ -49,7 +49,7 @@ class TestPcpView(unittest.TestCase):
         self.assertEqual(w.pcp_view.env_card.lbl_title.text(), TRANSLATIONS["de"]["pcp_card_environment"])
         self.assertEqual(w.ballistics_view.env_card.lbl_title.text(), TRANSLATIONS["de"]["pcp_card_environment"])
         self.assertIs(w.trajectory_stack.currentWidget(), w.pcp_view)
-        self.assertEqual(w.settings_view.projectiles_card.lbl_library.text(), TRANSLATIONS["de"]["library_title"])
+        self.assertIn(TRANSLATIONS["de"]["library_title"], w.settings_view.projectiles_card.btn_library.text())
         w.settings_view.combo_lang.setCurrentIndex(w.settings_view.combo_lang.findData("en"))
         w.settings_view.projectiles_card.set_mode(BallisticMode.AIRSOFT)
         w.close()

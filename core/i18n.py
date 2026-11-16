@@ -266,6 +266,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "own_projectile_has_bc": "I know its BC",
         "own_projectile_edit": "Edit",
         "own_projectile_confirm_delete": "Delete your projectile '{0}'?",
+        "orga_detail": "{0:.2f} J at {1:.2f} g · max {2:.2f} g",
+        "orga_no_weight": "none of your weights",
+        "orga_best_tooltip": "Heaviest weight in your active list that keeps this gun legal",
+        "orga_no_weight_tooltip": "Even the lightest weight in your active list is too heavy for this class",
+        "pcp_target_distance": "Target distance",
     },
     "de": {
         "app_name": "ChronoMate",
@@ -526,6 +531,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "own_projectile_has_bc": "BC bekannt",
         "own_projectile_edit": "Bearbeiten",
         "own_projectile_confirm_delete": "Dein Geschoss '{0}' löschen?",
+        "orga_detail": "{0:.2f} J bei {1:.2f} g · max. {2:.2f} g",
+        "orga_no_weight": "keins deiner Gewichte",
+        "orga_best_tooltip": "Schwerstes Gewicht deiner aktiven Liste, mit dem diese Waffe zulässig bleibt",
+        "orga_no_weight_tooltip": "Selbst das leichteste Gewicht deiner aktiven Liste ist für diese Klasse zu schwer",
+        "pcp_target_distance": "Zielentfernung",
     },
 }
 

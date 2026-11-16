@@ -115,6 +115,7 @@ class PcpSettings:
     step_m: float = 5.0
     max_range_m: float = 100.0
     energy_limit_j: float = 0.0   # 0 = off; e.g. 7.5 J (German F-mark) or 16.27 J (UK 12 ft-lb)
+    target_distance_m: float = 40.0   # where the target view shows the hit
 
     def to_dict(self) -> dict:
         return dict(self.__dict__)

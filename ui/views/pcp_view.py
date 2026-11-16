@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
-    QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QSizePolicy,
 )
 
 from core.config import ConfigManager
@@ -26,6 +26,8 @@ from core.weights import (KIND_PELLET, add_to_active, available_weights, new_own
                           resolve, select_option)
 from core.session_manager import SessionManager
 from ui.components.pcp_chart import PcpChart
+from ui.components.target_canvas import TargetCanvas
+from ui.components.responsive import ResponsiveGrid, ResponsiveRow
 from ui.components.environment_card import EnvironmentCard
 
 M_TO_YD = 1.0936133
@@ -65,6 +67,7 @@ class PcpView(QWidget):
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)   # the page fits the window
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(20, 16, 20, 16)
@@ -76,15 +79,22 @@ class PcpView(QWidget):
 
         self.lbl_atmo = QLabel("")
         self.lbl_atmo.setObjectName("label_secondary")
+        self.lbl_atmo.setWordWrap(True)
         layout.addWidget(self.lbl_atmo)
 
+        # Chart and target view side by side, stacked on narrow windows
         self.chart = PcpChart(dark_mode, self)
         self.chart.probe_changed.connect(self._on_probe)
-        layout.addWidget(self.chart)
+        self.target = TargetCanvas(dark_mode=dark_mode, parent=self)
+        top = ResponsiveRow(threshold=860)
+        top.add_widget(self.chart, 3)
+        top.add_widget(self.target, 1)
+        layout.addWidget(top)
 
         self.lbl_probe = QLabel(tr("pcp_probe_hint"))
         self.lbl_probe.setFont(QFont("Consolas, Courier New", 10, QFont.Bold))
         self.lbl_probe.setObjectName("label_secondary")
+        self.lbl_probe.setWordWrap(True)
         layout.addWidget(self.lbl_probe)
 
         # Summary ribbon
@@ -117,16 +127,12 @@ class PcpView(QWidget):
         layout.addWidget(self.lbl_warnings)
 
         # Input cards
-        # 2 × 2 card grid: fits a laptop window without horizontal scrolling
-        cards = QGridLayout()
-        cards.setSpacing(12)
-        cards.addWidget(self._build_projectile_card(), 0, 0)
-        cards.addWidget(self._build_shot_card(), 0, 1)
-        cards.addWidget(self._build_environment_card(), 1, 0)
-        cards.addWidget(self._build_bc_card(), 1, 1)
-        cards.setColumnStretch(0, 1)
-        cards.setColumnStretch(1, 1)
-        layout.addLayout(cards)
+        # Input cards: two columns when there's room, one below the other on narrow windows
+        cards = ResponsiveGrid(min_col_width=420, max_cols=2)
+        for card in (self._build_projectile_card(), self._build_shot_card(),
+                     self._build_environment_card(), self._build_bc_card()):
+            cards.add_widget(card)
+        layout.addWidget(cards)
 
         # Range card
         self.lbl_card_title = QLabel(tr("pcp_range_card"))
@@ -136,6 +142,7 @@ class PcpView(QWidget):
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
         self.table.setMinimumHeight(360)
+        self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)   # scrolls inside, not the page
         layout.addWidget(self.table)
 
         layout.addStretch()
@@ -169,6 +176,9 @@ class PcpView(QWidget):
         frame, g = self._card("pcp_card_projectile")
         pc = self._cfg.pcp
         self.combo_projectile = QComboBox()
+        # entries are long ("JSB … — 18.13 gr / 1.175 g — BC …"): don't let them widen the page
+        self.combo_projectile.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.combo_projectile.setMinimumContentsLength(18)
         self._fill_projectiles()
         self.combo_projectile.activated.connect(self._on_projectile_picked)
         g.addWidget(self.combo_projectile, 1, 0, 1, 2)
@@ -219,6 +229,7 @@ class PcpView(QWidget):
         self.spin_step = spin(1.0, 25.0, pc.step_m, 0, 1.0, "m")
         self.spin_max = spin(10.0, 250.0, pc.max_range_m, 0, 5.0, "m")
         self.spin_elimit = spin(0.0, 200.0, pc.energy_limit_j, 1, 0.5, "J")
+        self.spin_target = spin(5.0, 250.0, pc.target_distance_m, 0, 5.0, "m")
         self.spin_elimit.setSpecialValueText(tr("pcp_off"))
         self.spin_elimit.setToolTip(tr("pcp_energy_limit_tip"))
         self._row(g, 1, "pcp_velocity_source", self.combo_vsource)
@@ -231,8 +242,9 @@ class PcpView(QWidget):
         self._row(g, 8, "pcp_step", self.spin_step)
         self._row(g, 9, "pcp_max_range", self.spin_max)
         self._row(g, 10, "pcp_energy_limit", self.spin_elimit)
+        self._row(g, 11, "pcp_target_distance", self.spin_target)
         for w in (self.spin_velocity, self.spin_zero, self.spin_sight, self.spin_angle, self.spin_kz,
-                  self.spin_step, self.spin_max, self.spin_elimit):
+                  self.spin_step, self.spin_max, self.spin_elimit, self.spin_target):
             w.valueChanged.connect(self._on_input)
         self.combo_vsource.currentIndexChanged.connect(self._on_input)
         self.combo_click.currentIndexChanged.connect(self._on_input)
@@ -375,6 +387,7 @@ class PcpView(QWidget):
         pc.step_m = self.spin_step.value()
         pc.max_range_m = self.spin_max.value()
         pc.energy_limit_j = self.spin_elimit.value()
+        pc.target_distance_m = self.spin_target.value()
         self._cfg.save()
 
     # --- calculation ------------------------------------------------------------------------------
@@ -418,6 +431,8 @@ class PcpView(QWidget):
         self.lbl_atmo.setText(tr("pcp_atmo_line", self._v(p.muzzle_velocity_mps), r.muzzle_mach,
                                  r.air_density, r.speed_of_sound_mps))
         self.chart.set_result(r, p.max_range_m, p.kill_zone_cm)
+        tp = r.point_at(self._cfg.pcp.target_distance_m)
+        self.target.set_impact(self._cfg.pcp.target_distance_m, tp.drop_cm if tp else 0.0, tp.drift_cm if tp else 0.0)
 
         st = self._stat_labels
         st["pcp_stat_me"][1].setText(self._e(r.muzzle_energy_j))
@@ -570,4 +585,5 @@ class PcpView(QWidget):
     def set_theme(self, dark: bool):
         self._dark = dark
         self.chart.set_theme(dark)
+        self.target.set_theme(dark)
         self.recalculate()

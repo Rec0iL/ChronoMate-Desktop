@@ -202,3 +202,25 @@ class TestJouleGridSelection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOrgaVerdict(unittest.TestCase):
+    """Marshal: AR day, 0.32 g field weight; the card says hot / legal and which weight would pass."""
+
+    def test_hot_at_field_weight_but_lighter_bb_passes(self):
+        from core.orga import judge, LEGAL, ILLEGAL, AWAITING
+        from core.weights import resolve, DEFAULT_ACTIVE_BB
+        cfg = ConfigManager.get_instance()
+        opts = [resolve(cfg, i) for i in DEFAULT_ACTIVE_BB]
+        v = 99.0                                   # 1.57 J at 0.32 g
+        ar = judge(1.50, v, 0.32, opts)
+        self.assertEqual(ar.status, ILLEGAL)
+        self.assertAlmostEqual(ar.max_weight_g, 0.306, places=3)
+        self.assertAlmostEqual(ar.best.weight, 0.30)   # a 0.30 g player is fine
+        sniper = judge(2.80, v, 0.32, opts)
+        self.assertEqual(sniper.status, LEGAL)
+        self.assertAlmostEqual(sniper.best.weight, 0.45)
+        backup = judge(1.00, 150.0, 0.32, opts)        # even 0.20 g is too heavy
+        self.assertEqual(backup.status, ILLEGAL)
+        self.assertIsNone(backup.best)
+        self.assertEqual(judge(1.5, 0.0, 0.32, opts).status, AWAITING)

@@ -240,6 +240,19 @@ class Theme:
                     border-style: dashed;
                 }}
 
+                /* Expander buttons (e.g. "▸ Library"): flat, left-aligned */
+                QPushButton#expander_btn {{
+                    text-align: left;
+                    background: transparent;
+                    border: none;
+                    padding: 6px 2px;
+                    font-weight: 700;
+                }}
+                QPushButton#expander_btn:checked {{
+                    background: transparent;
+                    border: none;
+                }}
+
                 /* Lists (Projectiles: active list, library) */
                 QListWidget {{
                     background-color: #0a0d12;
@@ -474,6 +487,19 @@ class Theme:
                 /* Custom weights among the chips get a dashed outline */
                 QPushButton#chip_btn[custom="true"] {{
                     border-style: dashed;
+                }}
+
+                /* Expander buttons (e.g. "▸ Library"): flat, left-aligned */
+                QPushButton#expander_btn {{
+                    text-align: left;
+                    background: transparent;
+                    border: none;
+                    padding: 6px 2px;
+                    font-weight: 700;
+                }}
+                QPushButton#expander_btn:checked {{
+                    background: transparent;
+                    border: none;
                 }}
 
                 /* Lists (Projectiles: active list, library) */

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QApplication,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, Signal, QMimeData, QPoint
 from PySide6.QtGui import QFont, QColor, QDrag, QPixmap
@@ -38,7 +39,9 @@ from core.config import ConfigManager
 from core.session_manager import SessionManager
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
+from ui.components.responsive import ResponsiveGrid
 from core.weights import available_weights, is_selected, select_option
+from core.orga import judge, AWAITING, LEGAL
 from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
@@ -208,9 +211,18 @@ class ClassComplianceCard(QFrame):
         layout.addWidget(self.lbl_status)
         layout.addWidget(self.lbl_margin)
 
+        # Small field: the heaviest weight from the active list that keeps this gun legal (or none)
+        self.lbl_best = QLabel("--")
+        self.lbl_best.setFont(QFont("Segoe UI", 9, QFont.Bold))
+        self.lbl_best.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.lbl_best)
+        self._weight = 0.20
+        self._options = []
+
         # Reserve room for every state up front, so LEGAL ↔ ILLEGAL never re-flows the grid.
         reserve_text_space(self.lbl_status, [tr("awaiting_shot"), f"{tr('legal')} ✓", f"{tr('illegal')} ✕"])
-        reserve_text_space(self.lbl_margin, ["--", tr("max_bb_weight_label", 88.88), tr("exceeds_limit_20")], lines=2)
+        reserve_text_space(self.lbl_margin, ["--", tr("orga_detail", 8.88, 8.888, 8.888)], lines=2)
+        reserve_text_space(self.lbl_best, ["--", "✓ 0.88g", f"✕ {tr('orga_no_weight')}"], padding=16)
 
         self.update_velocity(0.0)
 
@@ -321,12 +333,20 @@ class ClassComplianceCard(QFrame):
         self.setToolTip(tr("active_ref_tooltip"))
         self.update_velocity(self._latest_velocity)
 
-    def update_velocity(self, velocity: float):
+    def update_velocity(self, velocity: float, weight: float = None, options=None):
+        """Judge this class at the selected (field) weight; show the best weight from the list."""
         self._latest_velocity = velocity
+        if weight is not None:
+            self._weight = weight
+        if options is not None:
+            self._options = options
         active_accent = "#00E5FF" if self._dark_mode else "#00838F"
         self.lbl_active_badge.setStyleSheet(f"color: {active_accent}; letter-spacing: 0.5px;")
+        green = "#88FF11" if self._dark_mode else "#1B5E20"
+        danger = "#F44336" if self._dark_mode else "#C62828"
+        v = judge(self.weapon_class.max_joules, velocity, self._weight, self._options)
 
-        if velocity <= 0.0:
+        if v.status == AWAITING:
             bg = "#161B22" if self._dark_mode else "#F0F2F5"
             border = active_accent if self._is_active else ("#30363D" if self._dark_mode else "#D0D7DE")
             self.lbl_name.setStyleSheet("color: #F0F6FC;" if self._dark_mode else "color: #1F2328;")
@@ -334,33 +354,29 @@ class ClassComplianceCard(QFrame):
             self.lbl_status.setStyleSheet("color: #8B949E;")
             self.lbl_margin.setText("--")
             self.lbl_margin.setStyleSheet("color: #8B949E;")
+            self.lbl_best.setText("--")
+            self.lbl_best.setStyleSheet("color: #8B949E; border-radius: 6px;")
+            self.lbl_best.setToolTip("")
         else:
-            # Energy at minimum standard 0.20g BB
-            e_20 = 0.5 * 0.00020 * (velocity ** 2)
-            max_w_grams = (2.0 * self.weapon_class.max_joules / (velocity ** 2)) * 1000.0
-
-            if e_20 <= self.weapon_class.max_joules:
-                # Legal at 0.20g
-                bg = "rgba(46, 125, 50, 0.28)" if self._dark_mode else "rgba(46, 125, 50, 0.15)"
-                border = active_accent if self._is_active else ("#2E7D32" if self._dark_mode else "#4CAF50")
-                accent = "#88FF11" if self._dark_mode else "#1B5E20"
-
-                self.lbl_name.setStyleSheet(f"color: {accent};")
-                self.lbl_status.setText(f"{tr('legal')} ✓")
-                self.lbl_status.setStyleSheet(f"color: {accent}; font-weight: bold;")
-                self.lbl_margin.setText(tr("max_bb_weight_label", max_w_grams))
-                self.lbl_margin.setStyleSheet(f"color: {accent};")
+            legal = v.status == LEGAL
+            bg = (("rgba(46, 125, 50, 0.28)" if self._dark_mode else "rgba(46, 125, 50, 0.15)") if legal
+                  else ("rgba(244, 67, 54, 0.28)" if self._dark_mode else "rgba(244, 67, 54, 0.15)"))
+            color = green if legal else danger
+            border = active_accent if self._is_active else (("#2E7D32" if self._dark_mode else "#4CAF50") if legal
+                                                            else ("#F44336" if self._dark_mode else "#C62828"))
+            self.lbl_name.setStyleSheet(f"color: {color};")
+            self.lbl_status.setText(f"{tr('legal')} ✓" if legal else f"{tr('illegal')} ✕")
+            self.lbl_status.setStyleSheet(f"color: {color}; font-weight: bold;")
+            self.lbl_margin.setText(tr("orga_detail", v.energy_j, self._weight, v.max_weight_g))
+            self.lbl_margin.setStyleSheet(f"color: {color};")
+            if v.best is not None:
+                self.lbl_best.setText(f"✓ {v.best.label}")
+                self.lbl_best.setToolTip(tr("orga_best_tooltip"))
+                self.lbl_best.setStyleSheet("color: #FFFFFF; background-color: #2E7D32; border-radius: 6px;")
             else:
-                # Over Limit even at 0.20g
-                bg = "rgba(244, 67, 54, 0.28)" if self._dark_mode else "rgba(244, 67, 54, 0.15)"
-                border = active_accent if self._is_active else ("#F44336" if self._dark_mode else "#C62828")
-                danger = "#F44336" if self._dark_mode else "#C62828"
-
-                self.lbl_name.setStyleSheet(f"color: {danger};")
-                self.lbl_status.setText(f"{tr('illegal')} ✕")
-                self.lbl_status.setStyleSheet(f"color: {danger}; font-weight: bold;")
-                self.lbl_margin.setText(tr("exceeds_limit_20"))
-                self.lbl_margin.setStyleSheet(f"color: {danger};")
+                self.lbl_best.setText(f"✕ {tr('orga_no_weight')}")
+                self.lbl_best.setToolTip(tr("orga_no_weight_tooltip"))
+                self.lbl_best.setStyleSheet("color: #FFFFFF; background-color: #C62828; border-radius: 6px;")
 
         edit_hover = "rgba(0, 229, 255, 0.22)" if self._dark_mode else "rgba(0, 131, 143, 0.2)"
         edit_bg = "rgba(255, 255, 255, 0.06)" if self._dark_mode else "rgba(0, 0, 0, 0.04)"
@@ -425,6 +441,7 @@ class OrgaView(QWidget):
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)   # the page fits the window
 
         container = QWidget()
         layout = QVBoxLayout(container)
@@ -435,8 +452,9 @@ class OrgaView(QWidget):
         title_row = QHBoxLayout()
         self.lbl_title = QLabel(tr("orga_limits"))
         self.lbl_title.setObjectName("page_title")
-        title_row.addWidget(self.lbl_title)
-        title_row.addStretch()
+        self.lbl_title.setWordWrap(True)
+        self.lbl_title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        title_row.addWidget(self.lbl_title, 1)   # takes the free space, wraps when narrow
 
         self.btn_reset_classes = QPushButton(f"↺ {tr('reset_weapon_classes')}")
         self.btn_reset_classes.setFixedHeight(28)
@@ -477,9 +495,9 @@ class OrgaView(QWidget):
         self.lbl_compliance_hdr.setObjectName("section_title")
         layout.addWidget(self.lbl_compliance_hdr)
 
-        self.compliance_container = QGridLayout()
-        self.compliance_container.setSpacing(10)
-        layout.addLayout(self.compliance_container)
+        # As many card columns as fit (up to 5), so a narrow window stacks them instead of clipping
+        self.compliance_container = ResponsiveGrid(min_col_width=200, max_cols=5, min_cols=1, spacing=10)
+        layout.addWidget(self.compliance_container)
 
         # 3. Joule Reference Grid (Color-coded across BB weights)
         self.lbl_grid_title = QLabel(tr("joule_grid_title"))
@@ -503,13 +521,7 @@ class OrgaView(QWidget):
         root_layout.addWidget(scroll)
 
     def rebuild_compliance_cards(self):
-        while self.compliance_container.count():
-            item = self.compliance_container.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.hide()
-                widget.setParent(None)
-                widget.deleteLater()
+        self.compliance_container.clear()
         self._compliance_cards.clear()
 
         # Ensure active weapon class is valid
@@ -532,14 +544,12 @@ class OrgaView(QWidget):
             card.clicked.connect(self._on_card_clicked)
             card.edit_requested.connect(self._edit_weapon_class)
             card.reorder_requested.connect(self._on_reorder_classes)
-            row = idx // cols
-            col = idx % cols
-            self.compliance_container.addWidget(card, row, col)
+            self.compliance_container.add_widget(card)
             self._compliance_cards.append(card)
 
         equalize_widths(self._compliance_cards)
-        for col in range(cols):
-            self.compliance_container.setColumnStretch(col, 1)
+        if self._compliance_cards:
+            self.compliance_container.set_min_col_width(self._compliance_cards[0].minimumWidth())
 
         self.refresh()
 
@@ -635,6 +645,8 @@ class OrgaView(QWidget):
 
     def set_active_weight(self, weight: float = None):
         self.joule_grid.set_selected_flags([is_selected(self._cfg, o) for o in self._grid_options])
+        if self._compliance_cards:
+            self.refresh()   # the cards are judged at the selected weight
 
     def _update_joule_grid(self):
         shots = self._sm.active_session.shots
@@ -651,9 +663,11 @@ class OrgaView(QWidget):
 
         self.lbl_vel.setText(f"{latest_vel:.2f} m/s" if latest_vel > 0 else "-- m/s")
 
-        # Update ALL weapon class cards simultaneously based on measured velocity
+        # Update ALL weapon class cards at once: judged at the selected (field) weight,
+        # with the best weight from the active list for players on other BBs
+        options = available_weights(self._cfg)
         for card in self._compliance_cards:
-            card.update_velocity(latest_vel)
+            card.update_velocity(latest_vel, self._cfg.selected_weight, options)
 
         # Update Joule reference grid based on active weapon class
         self._update_joule_grid()

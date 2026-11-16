@@ -24,6 +24,7 @@ from core.models import WeaponClass, STANDARD_BB_WEIGHTS
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
 from core.weights import available_weights, is_selected, select_option
+from core.orga import judge, AWAITING, LEGAL
 from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
@@ -86,27 +87,27 @@ class ScaledHudCard(QFrame):
 
         active_accent = "#00E5FF" if self._dark_mode else "#00838F"
 
-        if vel <= 0.0:
+        # Judged at the selected (field) weight, like the Orga page; best weight from the active list
+        cfg = ConfigManager.get_instance()
+        verdict = judge(self.weapon_class.max_joules, vel, cfg.selected_weight, available_weights(cfg))
+        if verdict.status == AWAITING:
             bg = "#161B22" if self._dark_mode else "#ECEFF1"
             border = active_accent if self._is_active else ("#30363D" if self._dark_mode else "#CFD8DC")
             text_c = "#8B949E" if self._dark_mode else "#607D8B"
             status_text = tr("awaiting_shot")
             detail_text = "--"
+        elif verdict.status == LEGAL:
+            bg = "rgba(46, 125, 50, 0.28)" if self._dark_mode else "rgba(46, 125, 50, 0.15)"
+            border = active_accent if self._is_active else ("#2E7D32" if self._dark_mode else "#4CAF50")
+            text_c = "#88FF11" if self._dark_mode else "#1B5E20"
+            status_text = f"{tr('legal')} ✓"
+            detail_text = f"✓ {verdict.best.label}" if verdict.best else f"✕ {tr('orga_no_weight')}"
         else:
-            e_20 = 0.5 * 0.00020 * (vel ** 2)
-            max_w = (2.0 * self.weapon_class.max_joules / (vel ** 2)) * 1000.0
-            if e_20 <= self.weapon_class.max_joules:
-                bg = "rgba(46, 125, 50, 0.28)" if self._dark_mode else "rgba(46, 125, 50, 0.15)"
-                border = active_accent if self._is_active else ("#2E7D32" if self._dark_mode else "#4CAF50")
-                text_c = "#88FF11" if self._dark_mode else "#1B5E20"
-                status_text = f"{tr('legal')} ✓"
-                detail_text = tr("max_bb_weight_label", max_w)
-            else:
-                bg = "rgba(244, 67, 54, 0.28)" if self._dark_mode else "rgba(244, 67, 54, 0.15)"
-                border = active_accent if self._is_active else ("#F44336" if self._dark_mode else "#C62828")
-                text_c = "#F44336" if self._dark_mode else "#C62828"
-                status_text = f"{tr('illegal')} ✕"
-                detail_text = tr("exceeds_limit_20")
+            bg = "rgba(244, 67, 54, 0.28)" if self._dark_mode else "rgba(244, 67, 54, 0.15)"
+            border = active_accent if self._is_active else ("#F44336" if self._dark_mode else "#C62828")
+            text_c = "#F44336" if self._dark_mode else "#C62828"
+            status_text = f"{tr('illegal')} ✕"
+            detail_text = f"✓ {verdict.best.label}" if verdict.best else f"✕ {tr('orga_no_weight')}"
 
         border_w = "3px" if self._is_active else "2px"
         self.setStyleSheet(f"""
@@ -136,7 +137,7 @@ class ScaledHudCard(QFrame):
         reserve_text_space(self.lbl_limit, [f"≤ {self.weapon_class.max_joules:.2f} J"], font(font_limit, QFont.Normal))
         reserve_text_space(self.lbl_status, [tr("awaiting_shot"), f"{tr('legal')} ✓", f"{tr('illegal')} ✕"],
                            font(font_status, QFont.Black))
-        reserve_text_space(self.lbl_detail, ["--", tr("max_bb_weight_label", 88.88), tr("exceeds_limit_20")],
+        reserve_text_space(self.lbl_detail, ["--", "✓ 0.88g", f"✕ {tr('orga_no_weight')}"],
                            font(font_detail, QFont.Normal), lines=2)
 
         self.lbl_name.setText(display_name)
