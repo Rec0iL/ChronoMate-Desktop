@@ -25,12 +25,18 @@ from core.session_manager import SessionManager
 from core.exporter import Exporter
 from core.i18n import tr
 
+DEFAULT_EXPORT_SHOTS = 10
+
 
 class ExportView(QWidget):
     def __init__(self, dark_mode: bool = True, parent=None):
         super().__init__(parent)
         self._dark_mode = dark_mode
         self._sm = SessionManager.get_instance()
+        # What the user picked on the slider: None = untouched (default "last 10"),
+        # "all" = keep following every shot, or a fixed number of shots.
+        self._user_choice = None
+        self._updating_slider = False
 
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
@@ -139,6 +145,9 @@ class ExportView(QWidget):
         self.refresh()
 
     def _on_slider_changed(self, val: int):
+        if not self._updating_slider:
+            total = len(self._sm.active_session.shots)
+            self._user_choice = "all" if total > 0 and val >= total else val
         self.lbl_shot_count.setText(str(val))
         self._update_summary(val)
 
@@ -156,7 +165,7 @@ class ExportView(QWidget):
         min_v = min(vels)
         es = max_v - min_v
         sd = (sum((v - avg) ** 2 for v in vels) / len(vels)) ** 0.5 if len(vels) > 1 else 0.0
-        return {"avg": avg, "max": max_v, "min": min_v, "es": es, "sd": sd, "rof": "0.0"}
+        return {"avg": avg, "max": max_v, "min": min_v, "es": es, "sd": sd, "rof": self._sm.fire_rate}
 
     def _update_summary(self, count: int):
         shots = self._get_export_shots()
@@ -211,10 +220,24 @@ class ExportView(QWidget):
             if Exporter.export_xlsx(Path(file_path), shots, self.edit_gun.text(), self.edit_player.text(), stats):
                 QMessageBox.information(self, "Export Successful", f"Excel workbook saved to:\n{file_path}")
 
+    def shots_to_include(self, total: int) -> int:
+        """Slider value for `total` shots, keeping the user's choice (same rule as Android)."""
+        if self._user_choice == "all":
+            value = total
+        elif isinstance(self._user_choice, int):
+            value = self._user_choice
+        else:
+            value = DEFAULT_EXPORT_SHOTS
+        return max(1, min(value, max(1, total)))
+
     def refresh(self):
         total = len(self._sm.active_session.shots)
+        if total == 0:
+            self._user_choice = None   # a new / cleared session starts at the default again
+        self._updating_slider = True
         self.slider_shots.setMaximum(max(1, total))
-        self.slider_shots.setValue(max(1, min(10, total)))
+        self.slider_shots.setValue(self.shots_to_include(total))
+        self._updating_slider = False
         self.lbl_shot_count.setText(str(self.slider_shots.value()))
         self._update_summary(self.slider_shots.value())
 
