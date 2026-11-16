@@ -43,9 +43,9 @@ from core.config import ConfigManager
 from core.session_manager import SessionManager
 from core.audio import AudioManager
 from core.i18n import tr, I18n
-from core.weights import available_weights, weight_in_list, same_weight, keep_selection_offered
+
 from core.pellets import CALIBERS, ALL_CALIBERS
-from ui.components.weight_chips import WeightChipBar
+from ui.components.projectiles_card import ProjectilesCard
 
 
 class SettingsView(QWidget):
@@ -216,90 +216,12 @@ class SettingsView(QWidget):
         self._update_network_input_visibility()
         layout.addWidget(net_card)
 
-        # 4. Weight Type & Custom Weights Table Card
-        weight_card = QFrame()
-        weight_card.setObjectName("card")
-        weight_layout = QVBoxLayout(weight_card)
-        weight_layout.setContentsMargins(16, 14, 16, 14)
-        weight_layout.setSpacing(12)
-
-        lbl_w_hdr = QLabel(tr("weight_config_title"))
-        lbl_w_hdr.setObjectName("section_title")
-        weight_layout.addWidget(lbl_w_hdr)
-
-        # Weight type buttons
-        w_type_row = QHBoxLayout()
-        self.btn_bb = QPushButton(tr("weight_type_bbs"))
-        self.btn_bb.setCheckable(True)
-        self.btn_bb.setChecked(self._cfg.weight_type == WeightType.BB)
-        self.btn_bb.clicked.connect(lambda: self._set_weight_type(WeightType.BB))
-
-        self.btn_diablo = QPushButton(tr("weight_type_diablos").replace("&", "&&"))
-        self.btn_diablo.setCheckable(True)
-        self.btn_diablo.setChecked(self._cfg.weight_type == WeightType.DIABLO)
-        self.btn_diablo.clicked.connect(lambda: self._set_weight_type(WeightType.DIABLO))
-
-        self.btn_custom = QPushButton(tr("weight_type_custom"))
-        self.btn_custom.setCheckable(True)
-        self.btn_custom.setChecked(self._cfg.weight_type == WeightType.CUSTOM)
-        self.btn_custom.clicked.connect(lambda: self._set_weight_type(WeightType.CUSTOM))
-
-        w_type_row.addWidget(self.btn_bb)
-        w_type_row.addWidget(self.btn_diablo)
-        w_type_row.addWidget(self.btn_custom)
-        weight_layout.addLayout(w_type_row)
-
-        # Caliber filter for the Diablos list (the pellet & slug catalogue)
-        cal_row = QHBoxLayout()
-        self.lbl_caliber = QLabel(tr("diabolo_caliber_label"))
-        self.combo_caliber = QComboBox()
-        for key, mm in CALIBERS:
-            self.combo_caliber.addItem(f"{mm:g} mm ({key})", key)
-        self.combo_caliber.addItem(tr("all_calibers"), ALL_CALIBERS)
-        self.combo_caliber.setCurrentIndex(max(0, self.combo_caliber.findData(self._cfg.diabolo_caliber)))
-        self.combo_caliber.currentIndexChanged.connect(self._on_caliber_changed)
-        cal_row.addWidget(self.lbl_caliber)
-        cal_row.addWidget(self.combo_caliber)
-        cal_row.addStretch()
-        weight_layout.addLayout(cal_row)
-        self._update_caliber_visibility()
-
-        # Always-show-custom switch (off = custom weights only appear with the Custom type)
-        self.chk_always_custom = QCheckBox(tr("always_show_custom"))
-        self.chk_always_custom.setChecked(self._cfg.always_show_custom_weights)
-        self.chk_always_custom.setToolTip(tr("always_show_custom_desc"))
-        self.chk_always_custom.toggled.connect(self._on_always_custom_toggled)
-        weight_layout.addWidget(self.chk_always_custom)
-
-        # Loaded weights: what the chips everywhere else offer right now (click = select)
-        self.lbl_loaded = QLabel(tr("loaded_weights"))
-        self.lbl_loaded.setObjectName("label_secondary")
-        weight_layout.addWidget(self.lbl_loaded)
-        self.loaded_chips = WeightChipBar(self)
-        self.loaded_chips.weight_clicked.connect(self._on_loaded_weight_clicked)
-        weight_layout.addWidget(self.loaded_chips)
-
-        # Custom Weights Table
-        self.lbl_custom_list = QLabel(tr("custom_weights_list"))
-        self.lbl_custom_list.setObjectName("label_secondary")
-        weight_layout.addWidget(self.lbl_custom_list)
-        self.custom_table = QTableWidget()
-        self.custom_table.setColumnCount(4)
-        self.custom_table.setHorizontalHeaderLabels([
-            tr("custom_col_name"), tr("custom_col_weight"), tr("custom_col_caliber"), tr("custom_col_action")
-        ])
-        self.custom_table.cellChanged.connect(self._on_custom_cell_changed)
-        self.custom_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.custom_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.custom_table.setFixedHeight(140)
-        weight_layout.addWidget(self.custom_table)
-
-        btn_add_w = QPushButton(f"+ {tr('add_row_button')}")
-        btn_add_w.clicked.connect(self._add_custom_weight)
-        weight_layout.addWidget(btn_add_w)
-        self._refresh_custom_weights_table()
-
-        layout.addWidget(weight_card)
+        # 4. Projectiles: mode switch (Airsoft / PCP), chips, active list and library
+        self.projectiles_card = ProjectilesCard(self)
+        self.projectiles_card.changed.connect(self.custom_weights_changed)
+        self.projectiles_card.mode_changed.connect(self.ballistic_mode_changed)
+        self.projectiles_card.weight_selected.connect(self.weight_selected)
+        layout.addWidget(self.projectiles_card)
 
         # 5. Calibration & Reference Shots Card
         cal_card = QFrame()
@@ -403,18 +325,10 @@ class SettingsView(QWidget):
         lbl_phys_hdr.setObjectName("section_title")
         phys_layout.addWidget(lbl_phys_hdr, 0, 0, 1, 2)
 
-        # Ballistic model: airsoft BB (hop-up) or PCP airgun calculator on the Trajectory page
-        self.combo_bmode = QComboBox()
-        self.combo_bmode.addItem(tr("ballistic_mode_airsoft"), BallisticMode.AIRSOFT.value)
-        self.combo_bmode.addItem(tr("ballistic_mode_pcp"), BallisticMode.PCP.value)
-        self.combo_bmode.setCurrentIndex(max(0, self.combo_bmode.findData(self._cfg.ballistic_mode.value)))
-        self.combo_bmode.currentIndexChanged.connect(self._on_bmode_changed)
+        # Units (the Airsoft / PCP switch lives in the Projectiles card)
         self.chk_imperial = QCheckBox(tr("show_imperial"))
         self.chk_imperial.setChecked(self._cfg.show_imperial)
         self.chk_imperial.toggled.connect(self._on_imperial_toggled)
-        self.lbl_bmode = QLabel(tr("ballistic_mode_label") + ":")
-        phys_layout.addWidget(self.lbl_bmode, 7, 0)
-        phys_layout.addWidget(self.combo_bmode, 7, 1)
         phys_layout.addWidget(self.chk_imperial, 8, 0, 1, 2)
 
         # Air density
@@ -546,157 +460,12 @@ class SettingsView(QWidget):
         self._cfg.save()
         self.network_config_changed.emit(self._cfg.auto_ip_enabled, self._cfg.custom_ip, self._cfg.custom_port)
 
-    def _set_weight_type(self, w_type: WeightType):
-        self._cfg.weight_type = w_type
-
-        # Keep the selected weight if the new list still offers it, else take its first weight,
-        # so new shots are never stored with a weight that isn't in the list.
-        keep_selection_offered(self._cfg)
-
-        self._cfg.save()
-        self.btn_bb.setChecked(w_type == WeightType.BB)
-        self.btn_diablo.setChecked(w_type == WeightType.DIABLO)
-        self.btn_custom.setChecked(w_type == WeightType.CUSTOM)
-        self._update_caliber_visibility()
-        self.loaded_chips.rebuild()
-
-        # Notify other views!
-        self.weight_type_changed.emit(w_type.value)
-
-    def _on_always_custom_toggled(self, checked: bool):
-        self._cfg.always_show_custom_weights = checked
-        keep_selection_offered(self._cfg)
-        self._cfg.save()
-        self.loaded_chips.rebuild()
-        self.custom_weights_changed.emit()
-
-    def _on_loaded_weight_clicked(self, weight: float):
-        # the chip bar has already stored the selection (and which pellet)
-        self.weight_selected.emit(weight)
-
-    def _on_caliber_changed(self, _idx: int):
-        self._cfg.diabolo_caliber = self.combo_caliber.currentData()
-        keep_selection_offered(self._cfg)
-        self._cfg.save()
-        self.loaded_chips.rebuild()
-        self.weight_type_changed.emit(self._cfg.weight_type.value)
+    def set_active_weight(self, weight: float):
+        self.projectiles_card.set_active_weight(weight)
 
     def sync_weight_controls(self):
-        """Show type, caliber and chips as stored (another page changed them)."""
-        t = self._cfg.weight_type
-        self.btn_bb.setChecked(t == WeightType.BB)
-        self.btn_diablo.setChecked(t == WeightType.DIABLO)
-        self.btn_custom.setChecked(t == WeightType.CUSTOM)
-        self.combo_caliber.blockSignals(True)
-        self.combo_caliber.setCurrentIndex(max(0, self.combo_caliber.findData(self._cfg.diabolo_caliber)))
-        self.combo_caliber.blockSignals(False)
-        self._update_caliber_visibility()
-        self.loaded_chips.rebuild()
-
-    def _update_caliber_visibility(self):
-        show = self._cfg.weight_type == WeightType.DIABLO
-        self.lbl_caliber.setVisible(show)
-        self.combo_caliber.setVisible(show)
-
-    def set_active_weight(self, weight: float):
-        self.loaded_chips.set_active(weight)
-
-    def _add_custom_weight(self):
-        name, ok1 = QInputDialog.getText(self, "Add Custom Weight", "Weight Name:", text=f"Custom #{len(self._cfg.custom_weights)+1}")
-        if not ok1 or not name:
-            return
-        weight, ok2 = QInputDialog.getDouble(self, "Add Custom Weight", "Weight in Grams (g):", value=0.25, minValue=0.01, maxValue=10.0, decimals=2)
-        if not ok2:
-            return
-
-        cw = CustomWeight(name=name.strip(), weight=weight, caliber=6.0)
-        self._cfg.custom_weights.append(cw)
-        self._cfg.save()
-        self._refresh_custom_weights_table()
-        self.loaded_chips.rebuild()
-        self.custom_weights_changed.emit()
-
-    def _delete_custom_weight(self, index: int):
-        if 0 <= index < len(self._cfg.custom_weights):
-            self._cfg.custom_weights.pop(index)
-            keep_selection_offered(self._cfg)
-            self._cfg.save()
-            self._refresh_custom_weights_table()
-            self.loaded_chips.rebuild()
-            self.custom_weights_changed.emit()
-
-    def _move_custom_weight(self, index: int, step: int):
-        cws = self._cfg.custom_weights
-        j = index + step
-        if 0 <= index < len(cws) and 0 <= j < len(cws):
-            cws[index], cws[j] = cws[j], cws[index]
-            self._cfg.save()
-            self._refresh_custom_weights_table()
-            self.loaded_chips.rebuild()
-            self.custom_weights_changed.emit()
-
-    def _on_custom_cell_changed(self, row: int, col: int):
-        """Typing into the custom weights table is saved (name, weight, caliber)."""
-        if not (0 <= row < len(self._cfg.custom_weights)) or col > 2:
-            return
-        item = self.custom_table.item(row, col)
-        if item is None:
-            return
-        cw = self._cfg.custom_weights[row]
-        text = item.text().strip().replace(",", ".")
-        old_weight = cw.weight
-        if col == 0:
-            if text:
-                cw.name = text
-        else:
-            try:
-                value = float(text)
-            except ValueError:
-                value = None
-            if col == 1 and value is not None and 0.01 <= value <= 100.0:
-                cw.weight = value
-            elif col == 2 and value is not None and 0.1 <= value <= 50.0:
-                cw.caliber = value
-        if same_weight(self._cfg.selected_weight, old_weight) and not same_weight(old_weight, cw.weight):
-            self._cfg.selected_weight = cw.weight
-        self._cfg.save()
-        # Rebuild after Qt has finished committing the edit (re-formats / undoes invalid input).
-        QTimer.singleShot(0, self._refresh_custom_weights_table)
-        self.loaded_chips.rebuild()
-        self.custom_weights_changed.emit()
-
-    def _refresh_custom_weights_table(self):
-        self.custom_table.blockSignals(True)
-        self._fill_custom_weights_table()
-        self.custom_table.blockSignals(False)
-
-    def _fill_custom_weights_table(self):
-        self.custom_table.setRowCount(len(self._cfg.custom_weights))
-        for idx, cw in enumerate(self._cfg.custom_weights):
-            self.custom_table.setItem(idx, 0, QTableWidgetItem(cw.name))
-            self.custom_table.setItem(idx, 1, QTableWidgetItem(f"{cw.weight:.2f}"))
-            self.custom_table.setItem(idx, 2, QTableWidgetItem(f"{cw.caliber:.2f}"))
-
-            # ▲ / ▼ sort the custom weights (the chips follow this order), ✕ deletes
-            act = QWidget()
-            act_l = QHBoxLayout(act)
-            act_l.setContentsMargins(2, 1, 2, 1)
-            act_l.setSpacing(4)
-            for text, tip, slot, enabled, danger in (
-                ("▲", tr("move_up"), lambda _, i=idx: self._move_custom_weight(i, -1), idx > 0, False),
-                ("▼", tr("move_down"), lambda _, i=idx: self._move_custom_weight(i, +1), idx < len(self._cfg.custom_weights) - 1, False),
-                ("✕", tr("delete"), lambda _, i=idx: self._delete_custom_weight(i), True, True),
-            ):
-                b = QPushButton(text)
-                b.setProperty("compact", "true")
-                if danger:
-                    b.setObjectName("danger_btn")
-                b.setFixedSize(26, 24)
-                b.setToolTip(tip)
-                b.setEnabled(enabled)
-                b.clicked.connect(slot)
-                act_l.addWidget(b)
-            self.custom_table.setCellWidget(idx, 3, act)
+        """Another page changed the mode, lists or selection."""
+        self.projectiles_card.refresh()
 
     # --- Calibration System ---
     def _toggle_calibration_recording(self):
@@ -886,23 +655,6 @@ class SettingsView(QWidget):
         self._sm.update_compensation_factor(factor)
         self.calibration_changed.emit(factor)
 
-    def _on_bmode_changed(self, _idx: int):
-        mode = BallisticMode(self.combo_bmode.currentData())
-        if mode == self._cfg.ballistic_mode:
-            return
-        self._cfg.ballistic_mode = mode
-        # PCP shoots pellets, not BBs: switch the weights to the Diablos catalogue, and back again.
-        if mode == BallisticMode.PCP:
-            if self._cfg.weight_type != WeightType.DIABLO:
-                self._cfg.airsoft_weight_type = self._cfg.weight_type
-            new_type = WeightType.DIABLO
-        else:
-            new_type = self._cfg.airsoft_weight_type
-        self._cfg.save()
-        if new_type != self._cfg.weight_type:
-            self._set_weight_type(new_type)
-        self.ballistic_mode_changed.emit(self._cfg.ballistic_mode.value)
-
     def _on_imperial_toggled(self, checked: bool):
         self._cfg.show_imperial = checked
         self._cfg.save()
@@ -924,18 +676,6 @@ class SettingsView(QWidget):
         self.btn_clear_cal.setText(tr("clear_calibration"))
         self.lbl_factor.setText(tr("comp_factor_display", self._cfg.get_compensation_factor()))
         self.refresh_calibration_table()
-        # Weights, ballistic model and units (added later; keep them in the user's language too)
-        self.chk_always_custom.setText(tr("always_show_custom"))
-        self.chk_always_custom.setToolTip(tr("always_show_custom_desc"))
-        self.lbl_loaded.setText(tr("loaded_weights"))
-        self.lbl_custom_list.setText(tr("custom_weights_list"))
-        self.custom_table.setHorizontalHeaderLabels([
-            tr("custom_col_name"), tr("custom_col_weight"), tr("custom_col_caliber"), tr("custom_col_action")
-        ])
-        self._refresh_custom_weights_table()
-        self.combo_bmode.setItemText(0, tr("ballistic_mode_airsoft"))
-        self.combo_bmode.setItemText(1, tr("ballistic_mode_pcp"))
-        self.lbl_bmode.setText(tr("ballistic_mode_label") + ":")
+        self.projectiles_card.retranslate()
         self.chk_imperial.setText(tr("show_imperial"))
-        self.lbl_caliber.setText(tr("diabolo_caliber_label"))
-        self.combo_caliber.setItemText(self.combo_caliber.count() - 1, tr("all_calibers"))
+

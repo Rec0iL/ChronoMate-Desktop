@@ -112,42 +112,27 @@ class TestChronoMateModifications(unittest.TestCase):
         self.assertNotIn("Status", headers)
 
     def test_weight_switching_dashboard_and_ballistics(self):
+        """One switch: Airsoft shows BBs, PCP shows the pellet active list (Dashboard + Trajectory)."""
+        from core.models import BallisticMode
+        from core.weights import DEFAULT_ACTIVE_BB, DEFAULT_ACTIVE_PCP, normalize_active
+        self.cfg.ballistic_mode = BallisticMode.AIRSOFT
+        self.cfg.active_airsoft, self.cfg.active_pcp = list(DEFAULT_ACTIVE_BB), list(DEFAULT_ACTIVE_PCP)
+        self.cfg.custom_weights = []
+        normalize_active(self.cfg)
         main_win = MainWindow()
 
-        # 1. Switch to DIABLO: the pellet catalogue (default caliber filter .177)
-        self.cfg.diabolo_caliber = ".177"
-        main_win.settings_view._set_weight_type(WeightType.DIABLO)
-        self.assertEqual(self.cfg.weight_type, WeightType.DIABLO)
-        first = pellets_for(".177")[0]
-        self.assertAlmostEqual(self.cfg.selected_weight, first.mass_grams)
-        self.assertEqual(self.cfg.selected_pellet, first.name)
+        main_win.settings_view.projectiles_card.set_mode(BallisticMode.PCP)
+        dash = [chip.text().replace("&&", "&") for chip in main_win.dashboard_view._weight_chips]
+        self.assertIn("JSB Exact Heavy .177 0.670g", dash)
+        self.assertNotIn("0.20g", dash)
+        ball = [chip.text().replace("&&", "&") for chip in main_win.ballistics_view._weight_chips]
+        self.assertIn("JSB Exact Heavy .177 0.670g", ball)
+        self.assertEqual(self.cfg.selected_item, DEFAULT_ACTIVE_PCP[0])   # 0.20 g not offered: first pellet
 
-        dash_chips_text = [chip.text().replace("&&", "&") for chip in main_win.dashboard_view._weight_chips]
-        self.assertIn("JSB Exact Heavy 0.670g", dash_chips_text)
-        self.assertIn("H&N Field Target Trophy 0.560g", dash_chips_text)
-        self.assertNotIn("0.20g", dash_chips_text)
-
-        ball_chips_text = [chip.text() for chip in main_win.ballistics_view._weight_chips]
-        self.assertIn("JSB Exact Heavy 0.670g", ball_chips_text)
-        self.assertNotIn("0.20g", ball_chips_text)
-
-        # 2. Switch to CUSTOM
-        self.cfg.custom_weights = [
-            CustomWeight(name="HeavySniper", weight=0.69, caliber=6.0)
-        ]
-        main_win.settings_view._set_weight_type(WeightType.CUSTOM)
-        self.assertEqual(self.cfg.weight_type, WeightType.CUSTOM)
-        self.assertAlmostEqual(self.cfg.selected_weight, 0.69)
-
-        dash_chips_text2 = [chip.text() for chip in main_win.dashboard_view._weight_chips]
-        self.assertTrue(any("HeavySniper" in t for t in dash_chips_text2))
-
-        # 3. Switch back to BB
-        main_win.settings_view._set_weight_type(WeightType.BB)
-        dash_chips_text3 = [chip.text() for chip in main_win.dashboard_view._weight_chips]
-        self.assertIn("0.20g", dash_chips_text3)
-        self.assertIn("0.25g", dash_chips_text3)
-
+        main_win.settings_view.projectiles_card.set_mode(BallisticMode.AIRSOFT)
+        dash = [chip.text() for chip in main_win.dashboard_view._weight_chips]
+        self.assertIn("0.20g", dash)
+        self.assertIn("0.25g", dash)
         main_win.close()
 
     def test_calibration_system(self):
@@ -234,7 +219,7 @@ class TestChronoMateModifications(unittest.TestCase):
         self.assertIn("1.50 J", orga.lbl_grid_title.text())
 
         # Selected weight elsewhere (0.30 g), so 0.20 / 0.45 keep their verdict borders
-        self.cfg.selected_weight, self.cfg.selected_pellet = 0.30, ""
+        self.cfg.selected_weight, self.cfg.selected_item = 0.30, "bb:0.30"
         orga.set_active_weight()
 
         # Add a test shot at 105.0 m/s

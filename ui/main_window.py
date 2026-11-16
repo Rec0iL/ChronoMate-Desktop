@@ -194,8 +194,8 @@ class MainWindow(QMainWindow):
         self.settings_view.theme_changed.connect(self._apply_theme)
         self.settings_view.language_changed.connect(self._on_language_changed)
         self.settings_view.network_config_changed.connect(self._on_network_config_changed)
-        self.settings_view.weight_type_changed.connect(self._on_weight_type_changed)
-        self.settings_view.custom_weights_changed.connect(self._on_custom_weights_changed)
+        self.settings_view.weight_type_changed.connect(self._on_projectiles_changed)
+        self.settings_view.custom_weights_changed.connect(self._on_projectiles_changed)
         self.settings_view.calibration_changed.connect(self._on_calibration_changed)
         self.settings_view.weight_selected.connect(self._on_weight_selected)
         self.settings_view.chrono_model_changed.connect(self.dashboard_view.update_title)
@@ -292,14 +292,14 @@ class MainWindow(QMainWindow):
         if self._hud_dialog and self._hud_dialog.isVisible():
             self._hud_dialog.refresh()
 
-    def _on_weight_type_changed(self, w_type_str: str):
+    def _on_projectiles_changed(self, *_):
+        """Mode, active lists, own projectiles or the selection changed: rebuild every list."""
         self.dashboard_view.rebuild_weight_chips()
         self.ballistics_view.rebuild_weight_chips()
         self.dashboard_view.refresh_stats()
         self.ballistics_view.recalculate()
         self.orga_view.rebuild_joule_grid_weights()
-        self.settings_view.loaded_chips.rebuild()
-        self.pcp_view.load_inputs()
+        self.pcp_view.refresh_settings()
 
     def _connect_pcp_view(self):
         self.pcp_view.weight_selected.connect(self._on_weight_selected)
@@ -327,22 +327,13 @@ class MainWindow(QMainWindow):
             self.ballistics_view.reload_environment()
 
     def _on_pcp_selection_changed(self):
-        """A pick on the PCP page may switch type / caliber: refresh every weight list."""
+        """A pick on the PCP page may add to the active list: refresh every list."""
         self.settings_view.sync_weight_controls()
-        self._on_weight_type_changed(self._cfg.weight_type.value)
+        self._on_projectiles_changed()
 
     def _on_pcp_custom_weights(self):
-        self.settings_view._refresh_custom_weights_table()
-        self.settings_view.loaded_chips.rebuild()
-        self._on_custom_weights_changed()
-
-    def _on_custom_weights_changed(self):
-        self.dashboard_view.rebuild_weight_chips()
-        self.ballistics_view.rebuild_weight_chips()
-        self.dashboard_view.refresh_stats()
-        self.ballistics_view.recalculate()
-        self.orga_view.rebuild_joule_grid_weights()
-        self.pcp_view.refresh_settings()
+        self.settings_view.sync_weight_controls()
+        self._on_projectiles_changed()
 
     def _on_weight_selected(self, weight: float):
         self.pcp_view.load_inputs()          # a picked pellet is the PCP projectile now

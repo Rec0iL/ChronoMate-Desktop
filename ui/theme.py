@@ -240,6 +240,24 @@ class Theme:
                     border-style: dashed;
                 }}
 
+                /* Lists (Projectiles: active list, library) */
+                QListWidget {{
+                    background-color: #0a0d12;
+                    border: 1px solid {cls.DARK_BORDER};
+                    border-radius: 6px;
+                    color: {cls.DARK_TEXT_PRIMARY};
+                }}
+                QListWidget::item {{
+                    border-bottom: 1px solid {cls.DARK_BORDER};
+                }}
+                QListWidget::item:hover {{
+                    background-color: {cls.DARK_SURFACE_HOVER};
+                }}
+                QListWidget QLabel {{
+                    color: {cls.DARK_TEXT_PRIMARY};
+                    background: transparent;
+                }}
+
                 /* LineEdit & Input */
                 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
                     background-color: #0a0d12;
@@ -456,6 +474,24 @@ class Theme:
                 /* Custom weights among the chips get a dashed outline */
                 QPushButton#chip_btn[custom="true"] {{
                     border-style: dashed;
+                }}
+
+                /* Lists (Projectiles: active list, library) */
+                QListWidget {{
+                    background-color: {cls.LIGHT_SURFACE};
+                    border: 1px solid {cls.LIGHT_BORDER};
+                    border-radius: 6px;
+                    color: {cls.LIGHT_TEXT_PRIMARY};
+                }}
+                QListWidget::item {{
+                    border-bottom: 1px solid {cls.LIGHT_BORDER};
+                }}
+                QListWidget::item:hover {{
+                    background-color: {cls.LIGHT_SURFACE_HOVER};
+                }}
+                QListWidget QLabel {{
+                    color: {cls.LIGHT_TEXT_PRIMARY};
+                    background: transparent;
                 }}
 
                 /* LineEdit & Input */

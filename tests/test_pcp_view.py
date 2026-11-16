@@ -27,14 +27,14 @@ class TestPcpView(unittest.TestCase):
         from ui.main_window import MainWindow
         w = MainWindow()
         w.poller.stop()
-        w.settings_view.combo_bmode.setCurrentIndex(w.settings_view.combo_bmode.findData(BallisticMode.PCP.value))
+        w.settings_view.projectiles_card.set_mode(BallisticMode.PCP)
         self.assertIs(w.trajectory_stack.currentWidget(), w.pcp_view)
         self.assertEqual(self.cfg.ballistic_mode, BallisticMode.PCP)
         # a new shot feeds the calculator ("latest shot" is the default velocity source)
         w._on_shot_detected(280.0)
         w.pcp_view.recalculate()
         self.assertAlmostEqual(w.pcp_view.params().muzzle_velocity_mps, 280.0)
-        w.settings_view.combo_bmode.setCurrentIndex(0)
+        w.settings_view.projectiles_card.set_mode(BallisticMode.AIRSOFT)
         self.assertIs(w.trajectory_stack.currentWidget(), w.ballistics_view)
         w.close()
 
@@ -43,27 +43,27 @@ class TestPcpView(unittest.TestCase):
         from core.i18n import TRANSLATIONS
         w = MainWindow()
         w.poller.stop()
-        w.settings_view.combo_bmode.setCurrentIndex(1)            # PCP
+        w.settings_view.projectiles_card.set_mode(BallisticMode.PCP)
         w.settings_view.combo_lang.setCurrentIndex(w.settings_view.combo_lang.findData("de"))
         self.assertEqual(w.pcp_view.lbl_title.text(), TRANSLATIONS["de"]["pcp_title"])
         self.assertEqual(w.pcp_view.env_card.lbl_title.text(), TRANSLATIONS["de"]["pcp_card_environment"])
         self.assertEqual(w.ballistics_view.env_card.lbl_title.text(), TRANSLATIONS["de"]["pcp_card_environment"])
         self.assertIs(w.trajectory_stack.currentWidget(), w.pcp_view)
-        self.assertEqual(w.settings_view.chk_always_custom.text(), TRANSLATIONS["de"]["always_show_custom"])
+        self.assertEqual(w.settings_view.projectiles_card.lbl_library.text(), TRANSLATIONS["de"]["library_title"])
         w.settings_view.combo_lang.setCurrentIndex(w.settings_view.combo_lang.findData("en"))
-        w.settings_view.combo_bmode.setCurrentIndex(0)
+        w.settings_view.projectiles_card.set_mode(BallisticMode.AIRSOFT)
         w.close()
 
     def test_preset_save_and_bc_tool(self):
         from ui.views.pcp_view import PcpView
         v = PcpView()
         idx = next(i for i in range(v.combo_projectile.count())
-                   if v.combo_projectile.itemData(i) == ("pellet", "JSB Exact Jumbo Heavy .22"))
+                   if v.combo_projectile.itemData(i) == ("id", "pellet:JSB Exact Jumbo Heavy .22"))
         v.combo_projectile.setCurrentIndex(idx)
         v._on_projectile_picked(idx)
         self.assertAlmostEqual(self.cfg.pcp.mass_grams, 1.175, places=3)
         self.assertAlmostEqual(self.cfg.pcp.bc, 0.033, places=3)
-        self.assertEqual(self.cfg.selected_pellet, "JSB Exact Jumbo Heavy .22")   # it's the chrono weight too
+        self.assertEqual(self.cfg.selected_item, "pellet:JSB Exact Jumbo Heavy .22")   # it's the chrono weight too
 
         v._save_as_custom()
         self.assertEqual(len(self.cfg.custom_weights), 1)

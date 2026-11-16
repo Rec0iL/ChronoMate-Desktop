@@ -143,6 +143,8 @@ class CustomWeight:
     caliber_unit: str = "mm"
     bc: Optional[float] = None        # ballistic coefficient for PCP mode (lb/in²), if known
     drag_model: str = "G1"
+    id: str = ""                      # stable id ("own:<id>" in the active lists)
+    kind: str = ""                    # "BB" (airsoft) or "PELLET" (PCP); set by migration if empty
 
     def display_label(self) -> str:
         return f"{self.name} {self.caliber}{self.caliber_unit} {self.weight:.2f}g"

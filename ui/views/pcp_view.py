@@ -21,9 +21,9 @@ from core.pcp_ballistics import (
     Atmosphere, PcpBallistics, PcpParams, PcpPoint, PcpResult, GRAIN_TO_GRAM, J_TO_FTLB, MPS_TO_FPS,
     MRAD_PER_MOA,
 )
-from core.pellets import ALL_CALIBERS, CALIBERS, PELLETS, pellets_for
-from core.weights import WeightOption, select_option
-from core.models import WeightType
+from core.pellets import CALIBERS, pellets_for
+from core.weights import (KIND_PELLET, add_to_active, available_weights, new_own_id, normalize_active,
+                          resolve, select_option)
 from core.session_manager import SessionManager
 from ui.components.pcp_chart import PcpChart
 from ui.components.environment_card import EnvironmentCard
@@ -278,50 +278,47 @@ class PcpView(QWidget):
 
     # --- projectile list --------------------------------------------------------------------------
     def _fill_projectiles(self):
-        """Your custom weights, then the pellet & slug catalogue grouped by caliber (same list as the
-        Diablos weight type)."""
+        """Your active list first (what the chips show), then the whole pellet & slug library grouped
+        by caliber. Picking from the library adds it to the active list."""
         self.combo_projectile.blockSignals(True)
         self.combo_projectile.clear()
         self.combo_projectile.addItem(tr("pcp_pick_projectile"), None)
-        for i, cw in enumerate(self._cfg.custom_weights):
-            bc = f", BC {cw.bc:.3f} {cw.drag_model}" if cw.bc else ""
-            self.combo_projectile.addItem(f"★ {cw.name} ({cw.weight:.3f} g{bc})", ("custom", i))
         model = self.combo_projectile.model()
-        for key, mm in CALIBERS:
-            self.combo_projectile.addItem(f"── {mm:g} mm ({key}) ──", None)
+
+        def header(text):
+            self.combo_projectile.addItem(text, None)
             model.item(self.combo_projectile.count() - 1).setEnabled(False)
+
+        header(f"── {tr('active_list_title')} ──")
+        for opt in available_weights(self._cfg, KIND_PELLET):
+            self.combo_projectile.addItem(("★ " if opt.is_custom else "") + opt.label + self._bc_text(opt), ("id", opt.id))
+        for key, mm in CALIBERS:
+            header(f"── {tr('library_title')} · {mm:g} mm ({key}) ──")
             for p in pellets_for(key):
-                bc = f"BC ≈{p.bc:.3f} ({p.bc_model or '?'}, {p.source})" if p.bc is not None else tr("pcp_bc_unknown")
                 kind = tr("pcp_slug") if p.slug else ""
+                bc = f"BC ≈{p.bc:.3f} ({p.bc_model or '?'}, {p.source})" if p.bc is not None else tr("pcp_bc_unknown")
                 self.combo_projectile.addItem(f"{p.name}{kind} — {p.grains:g} gr / {p.mass_grams:.3f} g — {bc}",
-                                              ("pellet", p.name))
+                                              ("id", "pellet:" + p.name))
         self.combo_projectile.setCurrentIndex(0)
         self.combo_projectile.blockSignals(False)
+
+    @staticmethod
+    def _bc_text(opt) -> str:
+        if opt.pellet is not None:
+            return f" — BC ≈{opt.pellet.bc:.3f}" if opt.pellet.bc is not None else f" — {tr('pcp_bc_unknown')}"
+        return ""
 
     def _on_projectile_picked(self, idx: int):
         data = self.combo_projectile.itemData(idx)
         if not data:
             return
-        kind, ref = data
-        if kind == "pellet":
-            # The catalogue is the Diablos weight list: picking here selects it there too.
-            p = next(x for x in PELLETS if x.name == ref)
-            self._cfg.weight_type = WeightType.DIABLO
-            if self._cfg.diabolo_caliber != ALL_CALIBERS:
-                self._cfg.diabolo_caliber = p.caliber
-            select_option(self._cfg, WeightOption(p.mass_grams, p.name, pellet=p))
-            if p.bc is None:
-                self.lbl_preset_note.setText(tr("pcp_bc_unknown_note", p.name))
-        else:
-            cw = self._cfg.custom_weights[ref]
-            select_option(self._cfg, WeightOption(cw.weight, cw.name, True))
-            pc = self._cfg.pcp
-            pc.projectile_name = cw.name
-            pc.mass_grams = cw.weight
-            if cw.caliber_unit == "mm":
-                pc.caliber_mm = cw.caliber
-            if cw.bc:
-                pc.bc, pc.drag_model = cw.bc, cw.drag_model
+        opt = resolve(self._cfg, data[1])
+        if opt is None:
+            return
+        add_to_active(self._cfg, opt.id)     # picked from the library: now also a chip
+        select_option(self._cfg, opt)
+        if opt.pellet is not None and opt.pellet.bc is None:
+            self.lbl_preset_note.setText(tr("pcp_bc_unknown_note", opt.pellet.name))
         self._cfg.save()
         self.load_inputs()
         self.selection_changed.emit()
@@ -338,18 +335,17 @@ class PcpView(QWidget):
         self._loading = False
 
     def _save_as_custom(self):
+        """The PCP projectile (with its BC) becomes one of your own pellets, active and selected."""
         pc = self._cfg.pcp
         name = pc.projectile_name or "Pellet"
-        for cw in self._cfg.custom_weights:
-            if cw.name == name and abs(cw.weight - pc.mass_grams) < 1e-4:
-                cw.bc, cw.drag_model, cw.caliber = pc.bc, pc.drag_model, pc.caliber_mm
-                break
-        else:
-            self._cfg.custom_weights.append(CustomWeight(name=name, weight=round(pc.mass_grams, 3),
-                                                         caliber=pc.caliber_mm, caliber_unit="mm",
-                                                         bc=pc.bc, drag_model=pc.drag_model))
-        self._cfg.selected_weight = round(pc.mass_grams, 3)
-        self._cfg.selected_pellet = ""
+        cw = next((c for c in self._cfg.custom_weights
+                   if c.kind == KIND_PELLET and c.name == name and abs(c.weight - pc.mass_grams) < 1e-4), None)
+        if cw is None:
+            cw = CustomWeight(name=name, weight=round(pc.mass_grams, 3), id=new_own_id(), kind=KIND_PELLET)
+            self._cfg.custom_weights.append(cw)
+        cw.caliber, cw.caliber_unit, cw.bc, cw.drag_model = pc.caliber_mm, "mm", pc.bc, pc.drag_model
+        normalize_active(self._cfg)
+        select_option(self._cfg, resolve(self._cfg, "own:" + cw.id))
         self._cfg.save()
         self._fill_projectiles()
         self.custom_weights_changed.emit()

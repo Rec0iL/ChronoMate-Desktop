@@ -53,10 +53,11 @@ class ConfigManager:
         self.selected_weight: float = 0.20
         self.weight_type: WeightType = WeightType.BB
         self.custom_weights: List[CustomWeight] = []
-        self.always_show_custom_weights: bool = False
-        self.selected_pellet: str = ""            # catalogue name when a pellet is selected
-        self.diabolo_caliber: str = ".177"        # caliber filter of the Diablos list (or "ALL")
-        self.airsoft_weight_type: WeightType = WeightType.BB   # restored when leaving PCP mode
+        # Projectiles: ordered active lists per mode (ids, see core/weights.py) and the selection
+        self.active_airsoft: List[str] = []
+        self.active_pcp: List[str] = []
+        self.selected_item: str = ""
+        self.library_caliber: str = ".177"        # caliber filter when browsing the pellet library
 
         self.max_allowed_joule: float = 1.50
         self.max_allowed_overhop_cm: float = 15.0
@@ -83,6 +84,11 @@ class ConfigManager:
         self.environment: EnvironmentSettings = EnvironmentSettings()
 
         self.load()
+        self._migrate_projectiles()
+
+    def _migrate_projectiles(self):
+        from core.weights import migrate
+        migrate(self, self._loaded_data)
 
     def effective_air_density(self) -> float:
         """Air density for the BB engine: the tuned value (Settings) scaled by today's weather
@@ -136,12 +142,14 @@ class ConfigManager:
         return 1.0
 
     def load(self):
+        self._loaded_data = {}
         if not self.config_path.exists():
             return
 
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            self._loaded_data = data
 
             self.is_dark_mode = data.get("is_dark_mode", True)
             self.language = data.get("language", "en")
@@ -158,15 +166,10 @@ class ConfigManager:
             self.selected_weight = float(data.get("selected_weight", 0.20))
             self.weight_type = WeightType(data.get("weight_type", WeightType.BB.value))
 
-            self.always_show_custom_weights = bool(data.get("always_show_custom_weights", False))
-            self.selected_pellet = data.get("selected_pellet", "")
-            if self.weight_type != WeightType.DIABLO:
-                self.selected_pellet = ""      # a pellet can only be selected while Diablos are shown
-            self.diabolo_caliber = data.get("diabolo_caliber", ".177")
-            try:
-                self.airsoft_weight_type = WeightType(data.get("airsoft_weight_type", WeightType.BB.value))
-            except ValueError:
-                self.airsoft_weight_type = WeightType.BB
+            self.active_airsoft = list(data.get("active_airsoft", []))
+            self.active_pcp = list(data.get("active_pcp", []))
+            self.selected_item = data.get("selected_item", "")
+            self.library_caliber = data.get("library_caliber", ".177")
             self.custom_weights = [
                 CustomWeight(
                     name=w.get("name", "Custom"),
@@ -175,6 +178,8 @@ class ConfigManager:
                     caliber_unit=w.get("caliber_unit", "mm"),
                     bc=float(w["bc"]) if w.get("bc") is not None else None,
                     drag_model=w.get("drag_model", "G1"),
+                    id=w.get("id", ""),
+                    kind=w.get("kind", ""),
                 )
                 for w in data.get("custom_weights", [])
             ]
@@ -226,10 +231,10 @@ class ConfigManager:
             "sound_muted": self.sound_muted,
             "selected_weight": self.selected_weight,
             "weight_type": self.weight_type.value,
-            "always_show_custom_weights": self.always_show_custom_weights,
-            "selected_pellet": self.selected_pellet,
-            "diabolo_caliber": self.diabolo_caliber,
-            "airsoft_weight_type": self.airsoft_weight_type.value,
+            "active_airsoft": self.active_airsoft,
+            "active_pcp": self.active_pcp,
+            "selected_item": self.selected_item,
+            "library_caliber": self.library_caliber,
             "custom_weights": [
                 {
                     "name": cw.name,
@@ -238,6 +243,8 @@ class ConfigManager:
                     "caliber_unit": cw.caliber_unit,
                     "bc": cw.bc,
                     "drag_model": cw.drag_model,
+                    "id": cw.id,
+                    "kind": cw.kind,
                 }
                 for cw in self.custom_weights
             ],
