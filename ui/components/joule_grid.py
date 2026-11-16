@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QWidget, QFrame, QVBoxLayout, QGridLayout, QLabel
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QColor
 from core.i18n import tr
+from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
 class JouleCard(QFrame):
@@ -32,6 +33,7 @@ class JouleCard(QFrame):
 
         layout.addWidget(self.lbl_weight)
         layout.addWidget(self.lbl_joules)
+        reserve_text_space(self.lbl_joules, ["-- J", "88.88 J"])
         self.update_state(0.0, 0.0, True)
 
     def update_state(self, energy: float, practical_weight: float, dark_mode: bool):
@@ -102,6 +104,13 @@ class JouleGrid(QWidget):
             col = idx % columns
             self._grid_layout.addWidget(card, row, col)
             self._cards.append(card)
+
+        # Equal, content-independent columns: "-- J" → "1.23 J" must not move anything.
+        equalize_widths(self._cards)
+        for c in range(self._grid_layout.columnCount()):
+            self._grid_layout.setColumnStretch(c, 0)
+        for c in range(columns):
+            self._grid_layout.setColumnStretch(c, 1)
 
     def update_velocity(self, velocity: float, max_allowed_joule: float):
         if not self._cards:

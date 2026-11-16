@@ -23,6 +23,7 @@ from core.config import ConfigManager
 from core.models import WeaponClass, STANDARD_BB_WEIGHTS
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
+from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
 class ScaledHudCard(QFrame):
@@ -119,15 +120,32 @@ class ScaledHudCard(QFrame):
             }}
         """)
         display_name = f"★ {self.weapon_class.name}" if self._is_active else self.weapon_class.name
-        self.lbl_name.setText(display_name)
         name_c = active_accent if self._is_active else text_c
-        self.lbl_name.setStyleSheet(f"color: {name_c}; font-size: {font_name}px; font-weight: 800;")
+
+        # Fonts are set as real QFonts (not style-sheet sizes) so the space every state needs can be
+        # reserved up front: LEGAL ↔ ILLEGAL must never resize the card row.
+        def font(px: int, weight) -> QFont:
+            f = QFont("Segoe UI")
+            f.setPixelSize(px)
+            f.setWeight(weight)
+            return f
+
+        name = self.weapon_class.name
+        reserve_text_space(self.lbl_name, [name, f"★ {name}"], font(font_name, QFont.ExtraBold))
+        reserve_text_space(self.lbl_limit, [f"≤ {self.weapon_class.max_joules:.2f} J"], font(font_limit, QFont.Normal))
+        reserve_text_space(self.lbl_status, [tr("awaiting_shot"), f"{tr('legal')} ✓", f"{tr('illegal')} ✕"],
+                           font(font_status, QFont.Black))
+        reserve_text_space(self.lbl_detail, ["--", tr("max_bb_weight_label", 88.88), tr("exceeds_limit_20")],
+                           font(font_detail, QFont.Normal))
+
+        self.lbl_name.setText(display_name)
+        self.lbl_name.setStyleSheet(f"color: {name_c};")
         self.lbl_limit.setText(f"≤ {self.weapon_class.max_joules:.2f} J")
-        self.lbl_limit.setStyleSheet(f"color: #8B949E; font-size: {font_limit}px;")
+        self.lbl_limit.setStyleSheet("color: #8B949E;")
         self.lbl_status.setText(status_text)
-        self.lbl_status.setStyleSheet(f"color: {text_c}; font-size: {font_status}px; font-weight: 900;")
+        self.lbl_status.setStyleSheet(f"color: {text_c};")
         self.lbl_detail.setText(detail_text)
-        self.lbl_detail.setStyleSheet(f"color: {text_c}; font-size: {font_detail}px;")
+        self.lbl_detail.setStyleSheet(f"color: {text_c};")
 
 
 class HudDialog(QDialog):
@@ -259,8 +277,9 @@ class HudDialog(QDialog):
             is_active = (wc.name == active_name)
             card = ScaledHudCard(wc, dark_mode=self._dark_mode, is_active=is_active, parent=self.cards_container)
             card.clicked.connect(self._on_hud_card_clicked)
-            self.cards_layout.addWidget(card)
+            self.cards_layout.addWidget(card, 1)
             self._cards.append(card)
+        equalize_widths(self._cards)
 
     def _on_hud_card_clicked(self, wc: WeaponClass):
         self._active_weapon_class = wc
@@ -450,6 +469,10 @@ class HudDialog(QDialog):
         vel = shots[-1].velocity if shots else 0.0
         for card in self._cards:
             card.update_velocity(vel, self._card_scale)
+        # Font sizes follow the screen size, so re-level the card widths after rescaling.
+        for card in self._cards:
+            card.setMinimumWidth(0)
+        equalize_widths(self._cards)
 
         # Joule Reference Grid columns & styling
         grid_cols = 10 if w >= 1100 else 5

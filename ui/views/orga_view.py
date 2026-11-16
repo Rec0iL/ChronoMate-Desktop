@@ -38,6 +38,7 @@ from core.config import ConfigManager
 from core.session_manager import SessionManager
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
+from ui.components.stable_text import reserve_text_space, equalize_widths
 
 
 class WeaponClassDialog(QDialog):
@@ -205,6 +206,10 @@ class ClassComplianceCard(QFrame):
         layout.addWidget(self.lbl_limit)
         layout.addWidget(self.lbl_status)
         layout.addWidget(self.lbl_margin)
+
+        # Reserve room for every state up front, so LEGAL ↔ ILLEGAL never re-flows the grid.
+        reserve_text_space(self.lbl_status, [tr("awaiting_shot"), f"{tr('legal')} ✓", f"{tr('illegal')} ✕"])
+        reserve_text_space(self.lbl_margin, ["--", tr("max_bb_weight_label", 88.88), tr("exceeds_limit_20")])
 
         self.update_velocity(0.0)
 
@@ -524,6 +529,10 @@ class OrgaView(QWidget):
             col = idx % cols
             self.compliance_container.addWidget(card, row, col)
             self._compliance_cards.append(card)
+
+        equalize_widths(self._compliance_cards)
+        for col in range(cols):
+            self.compliance_container.setColumnStretch(col, 1)
 
         self.refresh()
 
