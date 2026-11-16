@@ -54,6 +54,80 @@ class ConnectionState(str, Enum):
         return mapping.get(self, self.value)
 
 
+class BallisticMode(str, Enum):
+    AIRSOFT = "AIRSOFT"   # BB with hop-up (Magnus lift)
+    PCP = "PCP"           # airgun pellets & slugs (point-mass, G1/G7 drag)
+
+
+class ClickUnit(str, Enum):
+    MRAD_01 = "MRAD_01"     # 0.1 mrad per click
+    MOA_025 = "MOA_025"     # 1/4 MOA per click
+    MOA_0125 = "MOA_0125"   # 1/8 MOA per click
+
+    @property
+    def mrad_per_click(self) -> float:
+        return {ClickUnit.MRAD_01: 0.1, ClickUnit.MOA_025: 0.25 * 0.2908882, ClickUnit.MOA_0125: 0.125 * 0.2908882}[self]
+
+
+class VelocitySource(str, Enum):
+    LATEST = "LATEST"
+    AVERAGE = "AVERAGE"
+    MANUAL = "MANUAL"
+
+
+@dataclass
+class EnvironmentSettings:
+    """Weather at the range; used by the PCP calculator (and the BB engine's air density / wind)."""
+    temperature_c: float = 15.0
+    pressure_hpa: float = 1013.25
+    humidity_pct: float = 50.0
+    altitude_m: float = 0.0
+    use_altitude: bool = False
+    wind_speed_mps: float = 0.0
+    wind_clock: float = 3.0
+
+    def to_dict(self) -> dict:
+        return dict(self.__dict__)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "EnvironmentSettings":
+        e = cls()
+        for k, v in (d or {}).items():
+            if hasattr(e, k):
+                setattr(e, k, type(getattr(e, k))(v))
+        return e
+
+
+@dataclass
+class PcpSettings:
+    projectile_name: str = "JSB Exact Jumbo Heavy .22"
+    mass_grams: float = 1.175
+    caliber_mm: float = 5.52
+    bc: float = 0.033
+    drag_model: str = "G1"
+    velocity_source: str = VelocitySource.LATEST.value
+    manual_velocity_mps: float = 274.0
+    zero_range_m: float = 30.0
+    sight_height_cm: float = 5.0
+    click_unit: str = ClickUnit.MRAD_01.value
+    shot_angle_deg: float = 0.0
+    kill_zone_cm: float = 3.0
+    step_m: float = 5.0
+    max_range_m: float = 100.0
+    energy_limit_j: float = 0.0   # 0 = off; e.g. 7.5 J (German F-mark) or 16.27 J (UK 12 ft-lb)
+
+    def to_dict(self) -> dict:
+        return dict(self.__dict__)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PcpSettings":
+        s = cls()
+        for k, v in (d or {}).items():
+            if hasattr(s, k):
+                setattr(s, k, type(getattr(s, k))(v))
+        return s
+
+
 class SoundType(str, Enum):
     PEW = "pew"
     BEEP = "beep"
@@ -67,6 +141,8 @@ class CustomWeight:
     weight: float
     caliber: float = 6.0
     caliber_unit: str = "mm"
+    bc: Optional[float] = None        # ballistic coefficient for PCP mode (lb/in²), if known
+    drag_model: str = "G1"
 
     def display_label(self) -> str:
         return f"{self.name} {self.caliber}{self.caliber_unit} {self.weight:.2f}g"

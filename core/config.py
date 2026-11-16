@@ -15,6 +15,9 @@ from core.models import (
     CalibrationEntry,
     WeaponClass,
     SoundType,
+    BallisticMode,
+    EnvironmentSettings,
+    PcpSettings,
     DEFAULT_WEAPON_CLASSES,
 )
 
@@ -69,6 +72,12 @@ class ConfigManager:
         self.magnus_coefficient_k: float = 0.002
         self.spin_damping_cr: float = 0.01
         self.gravity: float = 9.81
+
+        # Ballistic model (Trajectory screen) and PCP calculator inputs
+        self.ballistic_mode: BallisticMode = BallisticMode.AIRSOFT
+        self.show_imperial: bool = False
+        self.pcp: PcpSettings = PcpSettings()
+        self.environment: EnvironmentSettings = EnvironmentSettings()
 
         self.load()
 
@@ -145,6 +154,8 @@ class ConfigManager:
                     weight=float(w.get("weight", 0.20)),
                     caliber=float(w.get("caliber", 6.0)),
                     caliber_unit=w.get("caliber_unit", "mm"),
+                    bc=float(w["bc"]) if w.get("bc") is not None else None,
+                    drag_model=w.get("drag_model", "G1"),
                 )
                 for w in data.get("custom_weights", [])
             ]
@@ -172,6 +183,14 @@ class ConfigManager:
             self.spin_damping_cr = float(data.get("spin_damping_cr", 0.01))
             self.gravity = float(data.get("gravity", 9.81))
 
+            try:
+                self.ballistic_mode = BallisticMode(data.get("ballistic_mode", BallisticMode.AIRSOFT.value))
+            except ValueError:
+                self.ballistic_mode = BallisticMode.AIRSOFT
+            self.show_imperial = bool(data.get("show_imperial", False))
+            self.pcp = PcpSettings.from_dict(data.get("pcp", {}))
+            self.environment = EnvironmentSettings.from_dict(data.get("environment", {}))
+
         except Exception as e:
             print(f"Error loading config: {e}")
 
@@ -195,6 +214,8 @@ class ConfigManager:
                     "weight": cw.weight,
                     "caliber": cw.caliber,
                     "caliber_unit": cw.caliber_unit,
+                    "bc": cw.bc,
+                    "drag_model": cw.drag_model,
                 }
                 for cw in self.custom_weights
             ],
@@ -213,6 +234,10 @@ class ConfigManager:
             "magnus_coefficient_k": self.magnus_coefficient_k,
             "spin_damping_cr": self.spin_damping_cr,
             "gravity": self.gravity,
+            "ballistic_mode": self.ballistic_mode.value,
+            "show_imperial": self.show_imperial,
+            "pcp": self.pcp.to_dict(),
+            "environment": self.environment.to_dict(),
         }
 
         try:

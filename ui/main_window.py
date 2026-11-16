@@ -30,6 +30,8 @@ from ui.components.status_badge import StatusBadge
 from ui.views.dashboard_view import DashboardView
 from ui.views.orga_view import OrgaView
 from ui.views.ballistics_view import BallisticsView
+from ui.views.pcp_view import PcpView
+from core.models import BallisticMode
 from ui.views.history_view import HistoryView
 from ui.views.export_view import ExportView
 from ui.views.settings_view import SettingsView
@@ -179,6 +181,11 @@ class MainWindow(QMainWindow):
         self.dashboard_view = DashboardView(dark_mode=self._cfg.is_dark_mode, parent=self)
         self.orga_view = OrgaView(dark_mode=self._cfg.is_dark_mode, parent=self)
         self.ballistics_view = BallisticsView(dark_mode=self._cfg.is_dark_mode, parent=self)
+        self.pcp_view = PcpView(dark_mode=self._cfg.is_dark_mode, parent=self)
+        # Trajectory page: airsoft hop-up simulation or the PCP calculator (Settings → Ballistic model)
+        self.trajectory_stack = QStackedWidget()
+        self.trajectory_stack.addWidget(self.ballistics_view)
+        self.trajectory_stack.addWidget(self.pcp_view)
         self.history_view = HistoryView(dark_mode=self._cfg.is_dark_mode, parent=self)
         self.export_view = ExportView(dark_mode=self._cfg.is_dark_mode, parent=self)
         self.settings_view = SettingsView(dark_mode=self._cfg.is_dark_mode, parent=self)
@@ -197,10 +204,15 @@ class MainWindow(QMainWindow):
         self.dashboard_view.weight_changed.connect(self._on_weight_selected)
         self.ballistics_view.weight_changed.connect(self._on_weight_selected)
         self.history_view.session_changed.connect(self._on_session_changed)
+        self.pcp_view.weight_selected.connect(self._on_weight_selected)
+        self.pcp_view.custom_weights_changed.connect(self._on_pcp_custom_weights)
+        self.settings_view.ballistic_mode_changed.connect(self._apply_ballistic_mode)
+        self.settings_view.units_changed.connect(self.pcp_view.refresh_settings)
+        self._apply_ballistic_mode(self._cfg.ballistic_mode.value)
 
         self.stack.addWidget(self.dashboard_view)
         self.stack.addWidget(self.orga_view)
-        self.stack.addWidget(self.ballistics_view)
+        self.stack.addWidget(self.trajectory_stack)
         self.stack.addWidget(self.history_view)
         self.stack.addWidget(self.export_view)
         self.stack.addWidget(self.settings_view)
@@ -233,7 +245,10 @@ class MainWindow(QMainWindow):
         elif index == 1:
             self.orga_view.refresh()
         elif index == 2:
-            self.ballistics_view.recalculate()
+            if self._cfg.ballistic_mode == BallisticMode.PCP:
+                self.pcp_view.recalculate()
+            else:
+                self.ballistics_view.recalculate()
         elif index == 3:
             self.history_view.refresh()
         elif index == 4:
@@ -270,6 +285,7 @@ class MainWindow(QMainWindow):
         self.dashboard_view.refresh_stats()
         self.orga_view.refresh()
         self.ballistics_view.update_from_new_shot(shot.velocity)
+        self.pcp_view.update_from_new_shot()
         self.history_view.refresh()
         self.export_view.refresh()
 
@@ -283,12 +299,23 @@ class MainWindow(QMainWindow):
         self.ballistics_view.recalculate()
         self.orga_view.refresh()
 
+    def _apply_ballistic_mode(self, mode: str):
+        self.trajectory_stack.setCurrentWidget(self.pcp_view if mode == BallisticMode.PCP.value else self.ballistics_view)
+        if mode == BallisticMode.PCP.value:
+            self.pcp_view.recalculate()
+
+    def _on_pcp_custom_weights(self):
+        self.settings_view._refresh_custom_weights_table()
+        self.settings_view.loaded_chips.rebuild()
+        self._on_custom_weights_changed()
+
     def _on_custom_weights_changed(self):
         self.dashboard_view.rebuild_weight_chips()
         self.ballistics_view.rebuild_weight_chips()
         self.dashboard_view.refresh_stats()
         self.ballistics_view.recalculate()
         self.orga_view.refresh()
+        self.pcp_view.refresh_settings()
 
     def _on_weight_selected(self, weight: float):
         self.dashboard_view.set_active_weight(weight)
@@ -342,6 +369,7 @@ class MainWindow(QMainWindow):
             self.dashboard_view.set_theme(dark_mode)
             self.orga_view.set_theme(dark_mode)
             self.ballistics_view.set_theme(dark_mode)
+            self.pcp_view.set_theme(dark_mode)
             self.history_view.set_theme(dark_mode)
             self.export_view.set_theme(dark_mode)
 

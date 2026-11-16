@@ -35,6 +35,7 @@ from core.models import (
     CustomWeight,
     CalibrationEntry,
     SoundType,
+    BallisticMode,
     STANDARD_BB_WEIGHTS,
     STANDARD_DIABLO_WEIGHTS,
 )
@@ -56,6 +57,8 @@ class SettingsView(QWidget):
     weight_selected = Signal(float)       # A weight chip in Settings was clicked
     chrono_model_changed = Signal()
     physics_changed = Signal()
+    ballistic_mode_changed = Signal(str)
+    units_changed = Signal()
 
     def __init__(self, dark_mode: bool = True, parent=None):
         super().__init__(parent)
@@ -383,6 +386,19 @@ class SettingsView(QWidget):
         lbl_phys_hdr = QLabel(tr("ballistics_engine_params"))
         lbl_phys_hdr.setObjectName("section_title")
         phys_layout.addWidget(lbl_phys_hdr, 0, 0, 1, 2)
+
+        # Ballistic model: airsoft BB (hop-up) or PCP airgun calculator on the Trajectory page
+        self.combo_bmode = QComboBox()
+        self.combo_bmode.addItem(tr("ballistic_mode_airsoft"), BallisticMode.AIRSOFT.value)
+        self.combo_bmode.addItem(tr("ballistic_mode_pcp"), BallisticMode.PCP.value)
+        self.combo_bmode.setCurrentIndex(max(0, self.combo_bmode.findData(self._cfg.ballistic_mode.value)))
+        self.combo_bmode.currentIndexChanged.connect(self._on_bmode_changed)
+        self.chk_imperial = QCheckBox(tr("show_imperial"))
+        self.chk_imperial.setChecked(self._cfg.show_imperial)
+        self.chk_imperial.toggled.connect(self._on_imperial_toggled)
+        phys_layout.addWidget(QLabel(tr("ballistic_mode_label") + ":"), 7, 0)
+        phys_layout.addWidget(self.combo_bmode, 7, 1)
+        phys_layout.addWidget(self.chk_imperial, 8, 0, 1, 2)
 
         # Air density
         lbl_rho = QLabel("Air Density (rho, kg/m³):")
@@ -808,6 +824,16 @@ class SettingsView(QWidget):
         factor = self._cfg.get_compensation_factor()
         self._sm.update_compensation_factor(factor)
         self.calibration_changed.emit(factor)
+
+    def _on_bmode_changed(self, _idx: int):
+        self._cfg.ballistic_mode = BallisticMode(self.combo_bmode.currentData())
+        self._cfg.save()
+        self.ballistic_mode_changed.emit(self._cfg.ballistic_mode.value)
+
+    def _on_imperial_toggled(self, checked: bool):
+        self._cfg.show_imperial = checked
+        self._cfg.save()
+        self.units_changed.emit()
 
     def _update_phys(self, **kwargs):
         for k, v in kwargs.items():
