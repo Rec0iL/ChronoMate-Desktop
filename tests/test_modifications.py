@@ -233,6 +233,10 @@ class TestChronoMateModifications(unittest.TestCase):
         self.assertIn("AR", orga.lbl_grid_title.text())
         self.assertIn("1.50 J", orga.lbl_grid_title.text())
 
+        # Selected weight elsewhere (0.30 g), so 0.20 / 0.45 keep their verdict borders
+        self.cfg.selected_weight, self.cfg.selected_pellet = 0.30, ""
+        orga.set_active_weight()
+
         # Add a test shot at 105.0 m/s
         shot = Shot(raw_velocity=105.0, weight_grams=0.20)
         self.sm.add_shot(shot)
@@ -243,7 +247,7 @@ class TestChronoMateModifications(unittest.TestCase):
         card_045 = next(c for c in orga.joule_grid._cards if abs(c.weight - 0.45) < 0.001)
 
         # Under AR (1.50 J): 0.20g (1.10 J) is safe (green #2E7D32); 0.45g (2.48 J) is illegal (red border #F44336)
-        self.assertIn("#2E7D32", card_020.styleSheet())
+        self.assertIn("rgba(46, 125, 50", card_020.styleSheet())   # green fill (the border may be the cyan selection)
         self.assertIn("#F44336", card_045.styleSheet())
 
         # Click on SNIPER card (2.80 J limit)

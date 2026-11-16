@@ -160,6 +160,8 @@ class ConfigManager:
 
             self.always_show_custom_weights = bool(data.get("always_show_custom_weights", False))
             self.selected_pellet = data.get("selected_pellet", "")
+            if self.weight_type != WeightType.DIABLO:
+                self.selected_pellet = ""      # a pellet can only be selected while Diablos are shown
             self.diabolo_caliber = data.get("diabolo_caliber", ".177")
             try:
                 self.airsoft_weight_type = WeightType(data.get("airsoft_weight_type", WeightType.BB.value))

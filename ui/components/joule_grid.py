@@ -79,7 +79,7 @@ class JouleCard(QFrame):
         self.setStyleSheet(f"""
             QFrame {{
                 background-color: {bg};
-                border: {"3.5px" if self.is_selected else "1.5px"} solid {border};
+                border: {"3.5px" if self.is_selected else "1.5px"} solid {("#00E5FF" if dark_mode else "#00838F") if self.is_selected else border};
                 border-radius: 8px;
             }}
             QLabel {{

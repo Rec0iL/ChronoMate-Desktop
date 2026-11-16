@@ -64,9 +64,11 @@ def is_selected(cfg, opt: WeightOption) -> bool:
     """Same weight, and for pellets the same pellet (two pellets can weigh the same)."""
     if not same_weight(opt.weight, cfg.selected_weight):
         return False
-    if opt.pellet is not None and cfg.selected_pellet:
+    # A pellet is selected by name; everything else only while no pellet is selected. Otherwise a
+    # custom 0.69 g and the 0.690 g Baracuda Match would both light up.
+    if opt.pellet is not None:
         return opt.pellet.name == cfg.selected_pellet
-    return True
+    return not cfg.selected_pellet
 
 
 def select_option(cfg, opt: WeightOption):

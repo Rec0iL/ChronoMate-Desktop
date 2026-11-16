@@ -29,6 +29,7 @@ class TestWeightsAndExport(unittest.TestCase):
         self.cfg = ConfigManager.get_instance()
         self.cfg.weight_type = WeightType.BB
         self.cfg.selected_weight = 0.20
+        self.cfg.selected_pellet = ""
         self.cfg.always_show_custom_weights = False
         self.cfg.custom_weights = [CustomWeight("Bio", 0.27), CustomWeight("Tracer", 0.30)]
         self.sm = SessionManager.get_instance()
@@ -184,3 +185,20 @@ class TestPelletCatalogue(unittest.TestCase):
         w.settings_view.combo_bmode.setCurrentIndex(0)          # back to airsoft: BBs again
         self.assertEqual(cfg.weight_type, WeightType.BB)
         w.close()
+
+
+class TestNoDoubleSelection(unittest.TestCase):
+    def test_custom_and_pellet_with_same_weight(self):
+        from core.weights import is_selected, select_option
+        cfg = ConfigManager.get_instance()
+        cfg.weight_type = WeightType.DIABLO
+        cfg.diabolo_caliber = ".177"
+        cfg.always_show_custom_weights = True
+        cfg.custom_weights = [CustomWeight("HeavySniper", 0.69)]
+        opts = available_weights(cfg)
+        bara = next(o for o in opts if o.pellet and o.pellet.name == "H&N Baracuda Match .177")
+        own = next(o for o in opts if o.is_custom)
+        select_option(cfg, bara)
+        self.assertEqual([o for o in opts if is_selected(cfg, o)], [bara])
+        select_option(cfg, own)
+        self.assertEqual([o for o in opts if is_selected(cfg, o)], [own])
