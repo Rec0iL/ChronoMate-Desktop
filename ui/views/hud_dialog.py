@@ -23,7 +23,7 @@ from core.config import ConfigManager
 from core.models import WeaponClass, STANDARD_BB_WEIGHTS
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
-from core.weights import available_weights, is_selected, select_option
+from core.weights import available_weights, is_selected, select_option, orga_selection, KIND_BB
 from core.orga import judge, AWAITING, LEGAL
 from ui.components.stable_text import reserve_text_space, equalize_widths
 
@@ -89,7 +89,7 @@ class ScaledHudCard(QFrame):
 
         # Judged at the selected (field) weight, like the Orga page; best weight from the active list
         cfg = ConfigManager.get_instance()
-        verdict = judge(self.weapon_class.max_joules, vel, cfg.selected_weight, available_weights(cfg))
+        verdict = judge(self.weapon_class.max_joules, vel, orga_selection(cfg).weight, available_weights(cfg, KIND_BB))
         if verdict.status == AWAITING:
             bg = "#161B22" if self._dark_mode else "#ECEFF1"
             border = active_accent if self._is_active else ("#30363D" if self._dark_mode else "#CFD8DC")
@@ -236,7 +236,7 @@ class HudDialog(QDialog):
         self.joule_layout.addWidget(self.lbl_hud_grid_title)
 
         self.hud_joule_grid = JouleGrid(dark_mode=self._dark_mode, parent=self.joule_container)
-        self._grid_options = available_weights(self._cfg)
+        self._grid_options = available_weights(self._cfg, KIND_BB)
         self.hud_joule_grid.set_weights([(o.weight, o.label) for o in self._grid_options], columns=10)
         self._mark_selected()
         self.hud_joule_grid.tile_clicked.connect(self._on_hud_tile_clicked)
@@ -494,7 +494,7 @@ class HudDialog(QDialog):
         grid_cols = 10 if w >= 1100 else 5
         if getattr(self, "_current_grid_cols", None) != grid_cols:
             self._current_grid_cols = grid_cols
-            self._grid_options = available_weights(self._cfg)
+            self._grid_options = available_weights(self._cfg, KIND_BB)
             self.hud_joule_grid.set_weights([(o.weight, o.label) for o in self._grid_options], columns=grid_cols)
             self._mark_selected()
             self._update_hud_joule_grid()

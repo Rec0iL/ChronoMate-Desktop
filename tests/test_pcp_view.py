@@ -56,6 +56,7 @@ class TestPcpView(unittest.TestCase):
 
     def test_preset_save_and_bc_tool(self):
         from ui.views.pcp_view import PcpView
+        self.cfg.ballistic_mode = BallisticMode.PCP     # the PCP page is shown in PCP mode
         v = PcpView()
         idx = next(i for i in range(v.combo_projectile.count())
                    if v.combo_projectile.itemData(i) == ("id", "pellet:JSB Exact Jumbo Heavy .22"))

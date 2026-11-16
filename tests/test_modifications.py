@@ -220,6 +220,7 @@ class TestChronoMateModifications(unittest.TestCase):
 
         # Selected weight elsewhere (0.30 g), so 0.20 / 0.45 keep their verdict borders
         self.cfg.selected_weight, self.cfg.selected_item = 0.30, "bb:0.30"
+        self.cfg.selected_by_kind["BB"] = "bb:0.30"
         orga.set_active_weight()
 
         # Add a test shot at 105.0 m/s

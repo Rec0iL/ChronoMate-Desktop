@@ -20,7 +20,7 @@ from core.i18n import tr
 from core.models import BallisticMode, CustomWeight
 from core.pellets import ALL_CALIBERS, CALIBERS
 from core.weights import (
-    KIND_BB, KIND_PELLET, active_ids, add_to_active, available_weights, delete_own, keep_selection_offered,
+    KIND_BB, KIND_PELLET, active_ids, restore_mode_selection, add_to_active, available_weights, delete_own, keep_selection_offered,
     library, mode_kind, move_active, new_own_id, normalize_active, own_by_id, remove_from_active, resolve,
 )
 
@@ -169,7 +169,7 @@ class ProjectilesCard(QFrame):
     def set_mode(self, mode: BallisticMode):
         if mode != self._cfg.ballistic_mode:
             self._cfg.ballistic_mode = mode
-            keep_selection_offered(self._cfg)
+            restore_mode_selection(self._cfg)
             self._cfg.save()
             self.refresh()
             self.mode_changed.emit(mode.value)

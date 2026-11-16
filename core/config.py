@@ -57,6 +57,7 @@ class ConfigManager:
         self.active_airsoft: List[str] = []
         self.active_pcp: List[str] = []
         self.selected_item: str = ""
+        self.selected_by_kind: dict = {}          # {"BB": id, "PELLET": id}: each mode keeps its pick
         self.library_caliber: str = ".177"        # caliber filter when browsing the pellet library
 
         self.max_allowed_joule: float = 1.50
@@ -169,6 +170,7 @@ class ConfigManager:
             self.active_airsoft = list(data.get("active_airsoft", []))
             self.active_pcp = list(data.get("active_pcp", []))
             self.selected_item = data.get("selected_item", "")
+            self.selected_by_kind = dict(data.get("selected_by_kind", {}))
             self.library_caliber = data.get("library_caliber", ".177")
             self.custom_weights = [
                 CustomWeight(
@@ -234,6 +236,7 @@ class ConfigManager:
             "active_airsoft": self.active_airsoft,
             "active_pcp": self.active_pcp,
             "selected_item": self.selected_item,
+            "selected_by_kind": self.selected_by_kind,
             "library_caliber": self.library_caliber,
             "custom_weights": [
                 {

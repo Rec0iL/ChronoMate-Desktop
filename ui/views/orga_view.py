@@ -40,7 +40,7 @@ from core.session_manager import SessionManager
 from core.i18n import tr
 from ui.components.joule_grid import JouleGrid
 from ui.components.responsive import ResponsiveGrid
-from core.weights import available_weights, is_selected, select_option
+from core.weights import available_weights, is_selected, select_option, orga_selection, KIND_BB
 from core.orga import judge, AWAITING, LEGAL
 from ui.components.stable_text import reserve_text_space, equalize_widths
 
@@ -630,7 +630,7 @@ class OrgaView(QWidget):
     def rebuild_joule_grid_weights(self):
         # Same list as the Dashboard chips; the selected weight (used for the alert sound) is marked
         # and a click on a tile selects it, so the orga picks the most common weight right here.
-        self._grid_options = available_weights(self._cfg)
+        self._grid_options = available_weights(self._cfg, KIND_BB)   # Orga is always airsoft
         weights: List[Tuple[float, str]] = [(o.weight, o.label) for o in self._grid_options]
         self.joule_grid.set_weights(weights, columns=5)
         self.set_active_weight()
@@ -665,9 +665,10 @@ class OrgaView(QWidget):
 
         # Update ALL weapon class cards at once: judged at the selected (field) weight,
         # with the best weight from the active list for players on other BBs
-        options = available_weights(self._cfg)
+        options = available_weights(self._cfg, KIND_BB)
+        field_weight = orga_selection(self._cfg).weight
         for card in self._compliance_cards:
-            card.update_velocity(latest_vel, self._cfg.selected_weight, options)
+            card.update_velocity(latest_vel, field_weight, options)
 
         # Update Joule reference grid based on active weapon class
         self._update_joule_grid()

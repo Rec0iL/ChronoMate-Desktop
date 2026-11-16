@@ -34,6 +34,7 @@ def fresh(cfg, mode=BallisticMode.AIRSOFT):
     cfg.active_airsoft = list(DEFAULT_ACTIVE_BB)
     cfg.active_pcp = list(DEFAULT_ACTIVE_PCP)
     cfg.selected_item, cfg.selected_weight = "bb:0.20", 0.20
+    cfg.selected_by_kind = {KIND_BB: "bb:0.20"}
     normalize_active(cfg)
 
 
@@ -121,7 +122,7 @@ class TestProjectiles(unittest.TestCase):
         card._add("pellet:JSB Exact King .25")                           # from the library
         chips = [c.text().replace("&&", "&") for c in w.dashboard_view._weight_chips]
         self.assertEqual(chips[-1], "JSB Exact King .25 1.645g")
-        self.assertEqual(w.orga_view.joule_grid._cards[-1].weight, 1.645)
+        self.assertEqual(w.orga_view.joule_grid._cards[-1].weight, 0.27)   # Orga stays airsoft
         card.btn_airsoft.click()
         self.assertIs(w.trajectory_stack.currentWidget(), w.ballistics_view)
         self.assertEqual([c.text() for c in w.dashboard_view._weight_chips][0], "0.20g")
@@ -224,3 +225,22 @@ class TestOrgaVerdict(unittest.TestCase):
         self.assertEqual(backup.status, ILLEGAL)
         self.assertIsNone(backup.best)
         self.assertEqual(judge(1.5, 0.0, 0.32, opts).status, AWAITING)
+
+
+class TestSelectionPerMode(unittest.TestCase):
+    def test_each_mode_keeps_its_pick_and_orga_stays_airsoft(self):
+        from core.weights import orga_selection, restore_mode_selection
+        cfg = ConfigManager.get_instance()
+        fresh(cfg)
+        select_option(cfg, resolve(cfg, "bb:0.32"))
+        cfg.ballistic_mode = BallisticMode.PCP
+        restore_mode_selection(cfg)
+        select_option(cfg, resolve(cfg, "pellet:JSB Exact Heavy .177"))
+        self.assertAlmostEqual(cfg.selected_weight, 0.670, places=3)     # shots use the pellet
+        self.assertEqual(orga_selection(cfg).id, "bb:0.32")              # Orga still judges at 0.32 g
+        cfg.ballistic_mode = BallisticMode.AIRSOFT
+        restore_mode_selection(cfg)
+        self.assertEqual(cfg.selected_item, "bb:0.32")                   # back to the BB pick
+        cfg.ballistic_mode = BallisticMode.PCP
+        restore_mode_selection(cfg)
+        self.assertEqual(cfg.selected_item, "pellet:JSB Exact Heavy .177")

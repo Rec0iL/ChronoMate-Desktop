@@ -169,14 +169,34 @@ def delete_own(cfg, own_id: str):
 # --- selection ------------------------------------------------------------------------------------
 
 def is_selected(cfg, opt: WeightOption) -> bool:
-    return opt.id == cfg.selected_item
+    """Each mode keeps its own selection (switching modes restores it)."""
+    return opt.id == cfg.selected_by_kind.get(opt.kind)
 
 
 def select_option(cfg, opt: WeightOption):
-    """Make `opt` the weight shots are recorded with, and keep the PCP projectile in step."""
-    cfg.selected_item = opt.id
-    cfg.selected_weight = opt.weight
+    """Remember `opt` as its mode's selection; in the current mode it is the weight shots are
+    recorded with. A pellet also becomes the PCP projectile."""
+    cfg.selected_by_kind[opt.kind] = opt.id
+    if opt.kind == mode_kind(cfg):
+        cfg.selected_item = opt.id
+        cfg.selected_weight = opt.weight
     sync_pcp_with_selection(cfg, opt)
+
+
+def restore_mode_selection(cfg):
+    """After a mode switch: bring back that mode's last selection (or a sensible one)."""
+    kind = mode_kind(cfg)
+    cfg.selected_item = cfg.selected_by_kind.get(kind, "")
+    opt = resolve(cfg, cfg.selected_item) if cfg.selected_item else None
+    if opt is not None:
+        cfg.selected_weight = opt.weight
+    keep_selection_offered(cfg)
+
+
+def orga_selection(cfg) -> WeightOption:
+    """Orga is always airsoft: the BB selection, whatever mode the Trajectory page is in."""
+    opts = available_weights(cfg, KIND_BB)
+    return next((o for o in opts if o.id == cfg.selected_by_kind.get(KIND_BB)), opts[0])
 
 
 def keep_selection_offered(cfg):
@@ -184,6 +204,7 @@ def keep_selection_offered(cfg):
     entry with the same weight, else the first."""
     options = available_weights(cfg)
     if any(o.id == cfg.selected_item for o in options):
+        cfg.selected_by_kind[mode_kind(cfg)] = cfg.selected_item
         return
     same = next((o for o in options if same_weight(o.weight, cfg.selected_weight)), None)
     select_option(cfg, same or options[0])
@@ -223,6 +244,10 @@ def migrate(cfg, data: dict):
         if old and ("pellet:" + old) not in cfg.active_pcp and _pellet_by_name(old):
             cfg.active_pcp.append("pellet:" + old)
     normalize_active(cfg)
+    if cfg.selected_item and not cfg.selected_by_kind:
+        opt = resolve(cfg, cfg.selected_item)
+        if opt is not None:
+            cfg.selected_by_kind[opt.kind] = opt.id
     if not cfg.selected_item:
         old = data.get("selected_pellet") or ""
         if old and cfg.ballistic_mode == BallisticMode.PCP:
