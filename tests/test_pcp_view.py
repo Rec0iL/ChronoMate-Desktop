@@ -58,10 +58,12 @@ class TestPcpView(unittest.TestCase):
         from ui.views.pcp_view import PcpView
         self.cfg.ballistic_mode = BallisticMode.PCP     # the PCP page is shown in PCP mode
         v = PcpView()
-        idx = next(i for i in range(v.combo_projectile.count())
-                   if v.combo_projectile.itemData(i) == ("id", "pellet:JSB Exact Jumbo Heavy .22"))
-        v.combo_projectile.setCurrentIndex(idx)
-        v._on_projectile_picked(idx)
+        # the picker shows the active list; the library is a collapsed sub-menu
+        top = [a.text().replace("&&", "&") for a in v.menu_projectile.actions() if a.text()]
+        self.assertTrue(any(t.startswith("JSB Exact Jumbo Heavy .22") for t in top))
+        self.assertFalse(any("Air Arms Diabolo Field" in t for t in top))          # library entry, not active
+        self.assertTrue(top[-1].startswith("Library"))
+        v._pick("pellet:JSB Exact Jumbo Heavy .22")
         self.assertAlmostEqual(self.cfg.pcp.mass_grams, 1.175, places=3)
         self.assertAlmostEqual(self.cfg.pcp.bc, 0.033, places=3)
         self.assertEqual(self.cfg.selected_item, "pellet:JSB Exact Jumbo Heavy .22")   # it's the chrono weight too

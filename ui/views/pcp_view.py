@@ -10,6 +10,7 @@ from typing import List, Optional
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
+    QMenu,
     QCheckBox, QComboBox, QDoubleSpinBox, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
     QPushButton, QScrollArea, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QSizePolicy,
 )
@@ -175,13 +176,13 @@ class PcpView(QWidget):
     def _build_projectile_card(self):
         frame, g = self._card("pcp_card_projectile")
         pc = self._cfg.pcp
-        self.combo_projectile = QComboBox()
-        # entries are long ("JSB … — 18.13 gr / 1.175 g — BC …"): don't let them widen the page
-        self.combo_projectile.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.combo_projectile.setMinimumContentsLength(18)
+        # Picker: your active projectiles; the library stays collapsed behind "Library ▸"
+        self.btn_projectile = QPushButton(f"{tr('pcp_pick_projectile')}  ▾")
+        self.btn_projectile.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.menu_projectile = QMenu(self)
+        self.btn_projectile.setMenu(self.menu_projectile)
         self._fill_projectiles()
-        self.combo_projectile.activated.connect(self._on_projectile_picked)
-        g.addWidget(self.combo_projectile, 1, 0, 1, 2)
+        g.addWidget(self.btn_projectile, 1, 0, 1, 2)
 
         self.spin_mass = spin(0.1, 20.0, pc.mass_grams, 3, 0.005, "g")
         self.lbl_grains = QLabel("")
@@ -290,29 +291,22 @@ class PcpView(QWidget):
 
     # --- projectile list --------------------------------------------------------------------------
     def _fill_projectiles(self):
-        """Your active list first (what the chips show), then the whole pellet & slug library grouped
+        """Your active projectiles (what the chips show); the whole library only behind "Library ▸",
         by caliber. Picking from the library adds it to the active list."""
-        self.combo_projectile.blockSignals(True)
-        self.combo_projectile.clear()
-        self.combo_projectile.addItem(tr("pcp_pick_projectile"), None)
-        model = self.combo_projectile.model()
-
-        def header(text):
-            self.combo_projectile.addItem(text, None)
-            model.item(self.combo_projectile.count() - 1).setEnabled(False)
-
-        header(f"── {tr('active_list_title')} ──")
+        m = self.menu_projectile
+        m.clear()
         for opt in available_weights(self._cfg, KIND_PELLET):
-            self.combo_projectile.addItem(("★ " if opt.is_custom else "") + opt.label + self._bc_text(opt), ("id", opt.id))
+            act = m.addAction((("★ " if opt.is_custom else "") + opt.label + self._bc_text(opt)).replace("&", "&&"))
+            act.triggered.connect(lambda _c=False, x=opt.id: self._pick(x))
+        m.addSeparator()
+        lib = m.addMenu(f"{tr('library_title')} ▸")
         for key, mm in CALIBERS:
-            header(f"── {tr('library_title')} · {mm:g} mm ({key}) ──")
+            sub = lib.addMenu(f"{mm:g} mm ({key})")
             for p in pellets_for(key):
                 kind = tr("pcp_slug") if p.slug else ""
                 bc = f"BC ≈{p.bc:.3f} ({p.bc_model or '?'}, {p.source})" if p.bc is not None else tr("pcp_bc_unknown")
-                self.combo_projectile.addItem(f"{p.name}{kind} — {p.grains:g} gr / {p.mass_grams:.3f} g — {bc}",
-                                              ("id", "pellet:" + p.name))
-        self.combo_projectile.setCurrentIndex(0)
-        self.combo_projectile.blockSignals(False)
+                act = sub.addAction(f"{p.name}{kind} — {p.grains:g} gr / {p.mass_grams:.3f} g — {bc}".replace("&", "&&"))
+                act.triggered.connect(lambda _c=False, x="pellet:" + p.name: self._pick(x))
 
     @staticmethod
     def _bc_text(opt) -> str:
@@ -320,11 +314,8 @@ class PcpView(QWidget):
             return f" — BC ≈{opt.pellet.bc:.3f}" if opt.pellet.bc is not None else f" — {tr('pcp_bc_unknown')}"
         return ""
 
-    def _on_projectile_picked(self, idx: int):
-        data = self.combo_projectile.itemData(idx)
-        if not data:
-            return
-        opt = resolve(self._cfg, data[1])
+    def _pick(self, item_id: str):
+        opt = resolve(self._cfg, item_id)
         if opt is None:
             return
         add_to_active(self._cfg, opt.id)     # picked from the library: now also a chip
