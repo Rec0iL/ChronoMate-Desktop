@@ -3,6 +3,7 @@ ChronoMate Desktop - Configuration and Settings Persistence
 """
 
 import json
+import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -28,7 +29,8 @@ class ConfigManager:
         return cls._instance
 
     def __init__(self):
-        config_dir = Path.home() / ".config" / "ChronoMate"
+        # CHRONOMATE_CONFIG_DIR lets tests (and portable installs) keep their own settings.
+        config_dir = Path(os.environ.get("CHRONOMATE_CONFIG_DIR") or Path.home() / ".config" / "ChronoMate")
         config_dir.mkdir(parents=True, exist_ok=True)
         self.config_path = config_dir / "settings.json"
 

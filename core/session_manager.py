@@ -4,6 +4,7 @@ Allows on-demand saving, loading, and management of shooting sessions.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import List, Optional
 from core.models import ChronoSession, Shot
@@ -19,7 +20,8 @@ class SessionManager:
         return cls._instance
 
     def __init__(self):
-        self.sessions_dir = Path.home() / ".local" / "share" / "ChronoMate" / "sessions"
+        data_dir = os.environ.get("CHRONOMATE_DATA_DIR")
+        self.sessions_dir = Path(data_dir) / "sessions" if data_dir else Path.home() / ".local" / "share" / "ChronoMate" / "sessions"
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
         self.active_session: ChronoSession = ChronoSession()
 
